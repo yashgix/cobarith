@@ -55,6 +55,15 @@ class RandomCasesTest(unittest.TestCase):
         self.assertEqual(len(first), 25)
         self.assertTrue(all(len(case) == 2 for case in first))
 
+    def test_cases_use_list_of_units(self) -> None:
+        statement = parse_program(
+            ["01 WS-A PIC S9(3).", "01 WS-B PIC S9(4)."],
+            ["ADD WS-A TO WS-B."],
+        )[0]
+        cases = random_cases(statement, n=10)
+        self.assertTrue(all(isinstance(case, list) for case in cases))
+        self.assertTrue(all(isinstance(value, int) for case in cases for value in case))
+
     def test_parity_ranges(self) -> None:
         statement = parse_program(["01 WS-A PIC S9(9)."], ["ADD WS-A TO WS-A."])[0]
         cases = random_cases(statement, n=100)
@@ -105,6 +114,15 @@ class BoundaryCasesTest(unittest.TestCase):
                 self.assertEqual(scaled.denominator, 1)
             else:
                 self.fail(f"unexpected kind {kind}")
+
+    def test_cases_use_list_of_units(self) -> None:
+        statement = parse_program(["01 WS-A PIC S9(3)."], ["COMPUTE WS-A = WS-A / 2."])[0]
+        results = boundary_cases(statement)
+        self.assertTrue(results)
+        for kind, _target_index, case in results:
+            with self.subTest(kind=kind):
+                self.assertIsInstance(case, list)
+                self.assertTrue(all(isinstance(value, int) for value in case))
 
     def test_size_and_sign_kinds_hold(self) -> None:
         statement = parse_program(
