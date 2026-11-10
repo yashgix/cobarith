@@ -1,4 +1,3 @@
-# fmt: off
 import json
 import os
 import shutil
@@ -74,7 +73,7 @@ class ExperimentTest(unittest.TestCase):
                 ['COMPUTE WS-A = WS-B / 5.'],
             )
             with (
-                mock.patch('experiment.random_cases', return_value=[[0, 13], [0, 17]]),
+                mock.patch('experiment.random_cases', return_value=[(0, 13), (0, 17)]),
                 mock.patch('experiment.boundary_cases', return_value=[]),
                 mock.patch('experiment.run', return_value=[((2,), False), ((3,), False)]),
             ):
@@ -121,10 +120,10 @@ class ExperimentTest(unittest.TestCase):
                 ['COMPUTE WS-A = WS-B / 5.'],
             )
             with (
-                mock.patch('experiment.random_cases', return_value=[[0, 13]]),
+                mock.patch('experiment.random_cases', return_value=[(0, 13)]),
                 mock.patch(
                     'experiment.boundary_cases',
-                    return_value=[('tie', 0, [0, 13]), ('over', 0, [0, 18])],
+                    return_value=[('tie', 0, (0, 13)), ('over', 0, (0, 18))],
                 ),
                 mock.patch('experiment.run', return_value=[((2,), False), ((3,), False)]),
             ):
@@ -144,7 +143,7 @@ class ExperimentTest(unittest.TestCase):
                 ['COMPUTE WS-A = WS-B.'],
             )
             with (
-                mock.patch('experiment.random_cases', return_value=[[0, 123]]),
+                mock.patch('experiment.random_cases', return_value=[(0, 123)]),
                 mock.patch('experiment.boundary_cases', return_value=[]),
                 mock.patch('experiment.run', return_value=[((23,), False)]),
             ):
@@ -171,7 +170,7 @@ class ExperimentTest(unittest.TestCase):
             first = Path(tmp) / 'first' / 'metrics.json'
             second = Path(tmp) / 'second' / 'metrics.json'
             with (
-                mock.patch('experiment.random_cases', return_value=[[0, 13]]),
+                mock.patch('experiment.random_cases', return_value=[(0, 13)]),
                 mock.patch('experiment.boundary_cases', return_value=[]),
                 mock.patch('experiment.run', return_value=[((2,), False)]),
             ):
@@ -197,7 +196,7 @@ class RealHarnessTest(unittest.TestCase):
                 ['COMPUTE WS-A = WS-B / 5.'],
             )
             with (
-                mock.patch('experiment.random_cases', return_value=[[0, 13]]),
+                mock.patch('experiment.random_cases', return_value=[(0, 13)]),
                 mock.patch('experiment.boundary_cases', return_value=[]),
             ):
                 metrics, records = experiment.experiment(root)

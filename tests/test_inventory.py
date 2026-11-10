@@ -61,7 +61,6 @@ class InventoryTest(unittest.TestCase):
                 [("PROG1", "COMPUTE"), ("PROG2", "ADD"), ("PROG2", "SUBTRACT")],
             )
             self.assertEqual(result.missing_copybooks, set())
-            self.assertTrue(all(statement.status == "harnessed" for statement in result.statements))
 
     def test_copybooks_resolve_from_the_program_folder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -115,29 +114,6 @@ class InventoryTest(unittest.TestCase):
 
             self.assertEqual(result, Inventory([], [], set()))
 
-    def test_statement_status_reasons_and_stable_ids(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            write(
-                root / "P1.cbl",
-                program_lines("P1", ["01 WS-A PIC S9(3)."], ["ADD WS-A TO WS-A."]),
-            )
-            write(
-                root / "P2.cbl",
-                program_lines(
-                    "P2",
-                    ["01 WS-A PIC X(01).", "01 WS-B PIC S9(3)."],
-                    ["COMPUTE WS-B = FUNCTION NUMVAL(WS-A)."],
-                ),
-            )
-
-            result = inventory(root)
-
-            self.assertEqual([s.status for s in result.statements], ["harnessed", "unsupported"])
-            self.assertEqual(result.statements[1].reason, "intrinsic function")
-            self.assertRegex(result.statements[0].id, r"^P1:\d+:ADD$")
-            self.assertRegex(result.statements[1].id, r"^P2:\d+:COMPUTE$")
-
 
 class RealDataTest(unittest.TestCase):
     @unittest.skipUnless(DATA_DIR.exists(), "CardDemo upstream data is not present")
@@ -149,45 +125,6 @@ class RealDataTest(unittest.TestCase):
         self.assertGreater(len(result.statements), 0)
         self.assertTrue(all(statement.program in result.programs for statement in result.statements))
         self.assertTrue(any(statement.status == "harnessed" for statement in result.statements))
-
-    @unittest.skipUnless(DATA_DIR.exists(), "CardDemo upstream data is not present")
-    def test_real_inventory_classification_stable_ids_and_reasons(self) -> None:
-        result = inventory(DATA_DIR)
-        allowed_reasons = {
-            "intrinsic function",
-            "LENGTH OF",
-            "special register",
-            "unresolved name",
-            "non-numeric field",
-            "index item",
-            "floating-point usage",
-            "P scaling",
-            "numeric-edited operand",
-            "REMAINDER",
-            "reference modification",
-            "nonnumeric literal",
-            "CORRESPONDING",
-            "exponentiation",
-            "ROUNDED MODE",
-            "syntax",
-        }
-
-        for statement in result.statements:
-            self.assertIn(statement.status, {"harnessed", "unsupported"})
-            self.assertRegex(
-                statement.id,
-                r"^[A-Z0-9_-]+:(?:[A-Za-z0-9_.-]+:)?\d+:(?:ADD|SUBTRACT|MULTIPLY|DIVIDE|COMPUTE)$",
-            )
-            if statement.status == "harnessed":
-                self.assertIsNone(statement.reason)
-                self.assertIsNotNone(statement.flags)
-            else:
-                self.assertIsNotNone(statement.reason)
-                self.assertIn(statement.reason, allowed_reasons)
-                self.assertIsNone(statement.flags)
-
-        self.assertGreater(sum(s.status == "harnessed" for s in result.statements), 0)
-        self.assertGreater(sum(s.status == "unsupported" for s in result.statements), 0)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from decimal import ROUND_HALF_EVEN, Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal
 from fractions import Fraction
 
 from .data import Pic, binary_bits, parse_pic
@@ -162,30 +162,6 @@ def _target_pic(stmt: Statement, assignment_index: int) -> Pic:
     return target.pic
 
 
-def _decimal_precision(value: Fraction, scale: int) -> int:
-    """Choose enough Decimal precision for the quantized integer result."""
-
-    scaled = abs(value) * 10**scale
-    numerator_digits = len(str(scaled.numerator))
-    denominator_digits = len(str(scaled.denominator))
-    return max(28, numerator_digits + denominator_digits + 10)
-
-
-def _decimal_units(
-    expr: Expr,
-    variables: Sequence[Variable],
-    case: Sequence[int],
-    scale: int,
-    exact_value: Fraction,
-) -> int:
-    quantum = Decimal(1).scaleb(-scale)
-    with localcontext() as ctx:
-        ctx.prec = _decimal_precision(exact_value, scale)
-        value = _eval_decimal(expr, variables, case)
-        quantized = value.quantize(quantum, rounding=ROUND_HALF_EVEN)
-        return int(quantized * (Decimal(10) ** scale))
-
-
 def translate(stmt: Statement, case: Sequence[int]) -> dict[str, list[int]]:
     """Stored units per target for each reference translation."""
 
@@ -205,8 +181,10 @@ def translate(stmt: Statement, case: Sequence[int]) -> dict[str, list[int]]:
         floating = _eval_float(assignment.expr, stmt.variables, case)
         results["float_round"].append(int(round(round(floating, scale) * 10**scale)))
 
+        decimal_value = _eval_decimal(assignment.expr, stmt.variables, case)
+        quantum = Decimal(1).scaleb(-scale)
         results["decimal_half_even"].append(
-            _decimal_units(assignment.expr, stmt.variables, case, scale, exact_value)
+            int(decimal_value.quantize(quantum, rounding=ROUND_HALF_EVEN))
         )
 
         results["float_truncate"].append(math.trunc(floating * 10**scale))
