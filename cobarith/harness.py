@@ -1,9 +1,4 @@
-"""GnuCOBOL harness: one generated program per statement, run over its cases.
-
-``Statement`` keeps the parsed arithmetic rather than the original tokens, so a statement is re-emitted here as
-one ``COMPUTE`` per receiving field. That reproduces the parsed interim results, the ``ROUNDED`` phrase and the
-size-error behaviour of the source statement, which is all the storage rule depends on.
-"""
+"""GnuCOBOL harness: one generated program per statement, run over its cases."""
 
 from __future__ import annotations
 
@@ -11,16 +6,17 @@ import os
 import subprocess
 import tempfile
 from collections.abc import Sequence
-from fractions import Fraction
 from pathlib import Path
 
 from .data import Pic, binary_bits
-from .stmt import Binary, Expr, Field, Literal, Statement, Unary, Variable
+from .source import Token
+from .stmt import Statement, Variable
 
 __all__ = ["program", "run"]
 
 _BINARY_USAGES = {"COMP", "COMP-5", "BINARY"}
 _AREA_B = "       "
+_DATA_B = "    "
 _STATEMENT = "           "
 _CODE_WIDTH = 65
 _NAME_LIMIT = 30
@@ -108,45 +104,38 @@ def _declaration(variable: Variable) -> str:
     return text
 
 
-def _literal_text(literal: Literal) -> str:
-    value = literal.value
-    scale = literal.scale
-    digits = f"{int(abs(value) * 10**scale):0{scale + 1}d}"
-    sign = "-" if value < 0 else ""
-    if scale:
-        return f"{sign}{digits[:-scale]}.{digits[-scale:]}"
-    return f"{sign}{digits}"
+def _touching(left: Token, right: Token) -> bool:
+    return left.file == right.file and left.line == right.line and left.end == right.col
 
 
-def _expression(expr: Expr, fields: Sequence[str]) -> str:
-    if isinstance(expr, Literal):
-        return _literal_text(expr)
-    if isinstance(expr, Field):
-        return fields[expr.index]
-    if isinstance(expr, Unary):
-        if expr.op == "+":
-            return _expression(expr.operand, fields)
-        if isinstance(expr.operand, Literal):
-            return _literal_text(Literal(-expr.operand.value, expr.operand.scale))
-        inner = _expression(expr.operand, fields)
-        if isinstance(expr.operand, (Binary, Unary)) or inner.startswith("-"):
-            inner = f"( {inner} )"
-        return f"-{inner}"
-    if isinstance(expr, Binary):
-        left = _expression(expr.left, fields)
-        right = _expression(expr.right, fields)
-        return f"( {left} {expr.op} {right} )"
-    raise TypeError(f"unsupported expression: {expr!r}")
+def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
+    tokens = list(stmt.tokens)
+    spans = {start: (end, index) for start, end, index in stmt.occurrences}
+    pieces: list[tuple[str, Token, Token]] = []
+    i = 0
+    while i < len(tokens):
+        span = spans.get(i)
+        if span is not None:
+            end, index = span
+            pieces.append((fields[index], tokens[i], tokens[end - 1]))
+            i = end
+        else:
+            token = tokens[i]
+            pieces.append((token.text, token, token))
+            i += 1
 
+    parts: list[str] = []
+    previous: Token | None = None
+    for piece, first, last in pieces:
+        if previous is not None and not _touching(previous, first):
+            parts.append(" ")
+        parts.append(piece)
+        previous = last
 
-def _assignment(assignment, size_error: bool, fields: Sequence[str]) -> str:
-    text = f"COMPUTE {fields[assignment.target]}"
-    if assignment.rounded:
-        text += " ROUNDED"
-    text += f" = {_expression(assignment.expr, fields)}"
-    if size_error:
-        text += f" ON SIZE ERROR MOVE 1 TO {_FLAG}"
-    return f"{text} END-COMPUTE"
+    code = "".join(parts)
+    if stmt.size_error:
+        code += f" ON SIZE ERROR MOVE 1 TO {_FLAG}"
+    return f"{code} END-{stmt.verb}"
 
 
 def program(stmt: Statement) -> str:
@@ -177,7 +166,7 @@ def program(stmt: Statement) -> str:
     add("01 CASE-RECORD.")
     for position, (source, variable) in enumerate(zip(sources, variables, strict=True)):
         end = "." if position == len(variables) - 1 else ""
-        add(f"05 {source} PIC {_input_picture(variable)} SIGN LEADING SEPARATE{end}")
+        add(f"05 {source} PIC {_input_picture(variable)} SIGN LEADING SEPARATE{end}", _DATA_B)
     add("WORKING-STORAGE SECTION.")
     add("01 WS-END-FLAG PIC X VALUE 'N'.")
     add(f"01 {_FLAG} PIC 9 VALUE 0.")
@@ -197,8 +186,7 @@ def program(stmt: Statement) -> str:
     for name, source in zip(fields, sources, strict=True):
         add(f"MOVE {source} TO {name}", _STATEMENT)
     add(f"MOVE 0 TO {_FLAG}", _STATEMENT)
-    for assignment in stmt.assignments:
-        add(_assignment(assignment, stmt.size_error, fields), _STATEMENT)
+    add(_statement_text(stmt, fields), _STATEMENT)
     for display in displays:
         add(f"DISPLAY {display}", _STATEMENT)
     add(f"DISPLAY {_FLAG}", _STATEMENT)

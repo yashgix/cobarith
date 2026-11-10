@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from fractions import Fraction
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from .data import Item, Pic, find_item
 from .source import Token
@@ -85,6 +85,8 @@ class Statement:
     assignments: list[Assignment] = field(default_factory=list, repr=False)
     target_indices: list[int] = field(default_factory=list, repr=False)
     read_flags: list[bool] = field(default_factory=list, repr=False)
+    tokens: list[Token] = field(default_factory=list, repr=False)
+    occurrences: list[tuple[int, int, int]] = field(default_factory=list, repr=False)
 
 
 _VERBS = {"ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE"}
@@ -308,11 +310,12 @@ class _Parser:
         self.items = list(items)
         self.i = 0
         self.refs: list[_Ref] = []
-        self.by_key: dict[tuple[str, tuple[str, ...], str | None], int] = {}
+        self.by_key: dict[tuple[object, ...], int] = {}
         self.read: list[bool] = []
         self.target_indices: list[int] = []
         self.target_names: list[str] = []
         self.assignments: list[Assignment] = []
+        self.occurrences: list[tuple[int, int, int]] = []
 
     def parse(self) -> None:
         if not self.tokens or self.tokens[0].kind != "word":
@@ -336,8 +339,10 @@ class _Parser:
     def resolve_variables(self) -> list[Variable]:
         variables: list[Variable] = []
         for ref in self.refs:
-            item = find_item(self.items, ref.base, ref.qualifiers)
-            ref.item = item
+            item = ref.item
+            if item is None:
+                item = find_item(self.items, ref.base, ref.qualifiers)
+                ref.item = item
             if item is None:
                 variables.append(Variable(ref.name, None, ""))
             else:
@@ -390,13 +395,17 @@ class _Parser:
     def _record_ref(self, base: str, qualifiers: Sequence[str], subscript: str | None) -> _Ref:
         base_upper = base.upper()
         qualifiers_upper = tuple(qualifier.upper() for qualifier in qualifiers)
-        key = (base_upper, qualifiers_upper, subscript)
+        item = find_item(self.items, base_upper, qualifiers_upper)
+        if item is not None:
+            key: tuple[object, ...] = ("item", id(item), subscript)
+        else:
+            key = ("name", base_upper, qualifiers_upper, subscript)
         if key in self.by_key:
             return self.refs[self.by_key[key]]
 
         index = len(self.refs)
         name = base_upper if subscript is None else f"{base_upper}({subscript})"
-        ref = _Ref(name, base_upper, qualifiers_upper, subscript, index)
+        ref = _Ref(name, base_upper, qualifiers_upper, subscript, index, item)
         self.refs.append(ref)
         self.by_key[key] = index
         self.read.append(False)
@@ -425,6 +434,7 @@ class _Parser:
         raise _ParseError
 
     def _parse_ref(self) -> _Ref:
+        start = self.i
         token = self._current()
         if token is None or token.kind != "word" or token.text in _RESERVED:
             raise _ParseError
@@ -442,7 +452,9 @@ class _Parser:
             self.i += 1
             self._parse_subscript()
 
-        return self._record_ref(base, qualifiers, subscript)
+        ref = self._record_ref(base, qualifiers, subscript)
+        self.occurrences.append((start, self.i, ref.index))
+        return ref
 
     def _parse_number(self) -> Literal:
         sign = 1
@@ -950,6 +962,8 @@ def _build_statement(
         list(parser.assignments),
         list(parser.target_indices),
         list(parser.read),
+        token_list,
+        list(parser.occurrences),
     )
 
 

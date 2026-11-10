@@ -55,7 +55,8 @@ class PicTest(unittest.TestCase):
         self.assertEqual(binary_bits(parse_pic("S9(5)")), 32)
         self.assertEqual(binary_bits(parse_pic("S9(9)")), 32)
         self.assertEqual(binary_bits(parse_pic("S9(10)")), 64)
-        self.assertEqual(binary_bits("S9(08)V9"), 64)
+        self.assertEqual(binary_bits("S9(08)V9"), 32)
+        self.assertEqual(binary_bits("S9(09)V9"), 64)
 
 
 class DataItemTest(unittest.TestCase):
