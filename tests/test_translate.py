@@ -1,3 +1,5 @@
+"""Tests for the COBOL storage rule and plausible Python translations."""
+
 import tempfile
 import unittest
 from fractions import Fraction
@@ -213,6 +215,30 @@ class TranslateTest(unittest.TestCase):
         self.assertEqual(results["float_round"], [2])
         self.assertEqual(results["decimal_half_even"], [2])
         self.assertEqual(results["float_truncate"], [2])
+
+    def test_decimal_half_even_uses_integer_units_for_nonzero_scale(self) -> None:
+        data = [
+            "01 WS-A PIC S9(3)V99.",
+            "01 WS-B PIC 9(1).",
+            "01 WS-C PIC S9(2)V99.",
+        ]
+        statement = parse_program(data, ["COMPUTE WS-C = WS-A / WS-B."])[0]
+        results = translate(statement, [0, 12345, 1])
+
+        self.assertEqual(results["decimal_half_even"], [12345])
+
+    def test_decimal_wide_multiplication_does_not_raise(self) -> None:
+        data = [
+            "01 WS-A PIC 9(16).",
+            "01 WS-B PIC 9(16).",
+            "01 WS-C PIC 9(32).",
+        ]
+        statement = parse_program(data, ["COMPUTE WS-C = WS-A * WS-B."])[0]
+        expected = 9999999999999999**2
+        results = translate(statement, [0, 9999999999999999, 9999999999999999])
+
+        self.assertEqual(results["exact_no_size"], [expected])
+        self.assertEqual(results["decimal_half_even"], [expected])
 
 
 class StorageChangedTest(unittest.TestCase):
