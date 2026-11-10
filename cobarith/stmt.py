@@ -85,6 +85,7 @@ class Statement:
     assignments: list[Assignment] = field(default_factory=list, repr=False)
     target_indices: list[int] = field(default_factory=list, repr=False)
     read_flags: list[bool] = field(default_factory=list, repr=False)
+    tokens: list[Token] = field(default_factory=list, repr=False)
 
 
 _VERBS = {"ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE"}
@@ -302,6 +303,20 @@ def _sum_expr(exprs: Sequence[Expr]) -> Expr:
     return total
 
 
+def _remap_expr(expr: Expr, mapping: dict[int, int]) -> Expr:
+    if isinstance(expr, Field):
+        return Field(mapping[expr.index])
+    if isinstance(expr, Unary):
+        return Unary(expr.op, _remap_expr(expr.operand, mapping))
+    if isinstance(expr, Binary):
+        return Binary(
+            expr.op,
+            _remap_expr(expr.left, mapping),
+            _remap_expr(expr.right, mapping),
+        )
+    return expr
+
+
 class _Parser:
     def __init__(self, tokens: Sequence[Token], items: Iterable[Item]) -> None:
         self.tokens = list(tokens)
@@ -313,6 +328,14 @@ class _Parser:
         self.target_indices: list[int] = []
         self.target_names: list[str] = []
         self.assignments: list[Assignment] = []
+        self.finalized = False
+        self.variables_final: list[Variable] = []
+        self.items_final: list[Item | None] = []
+        self.unresolved_final: list[bool] = []
+        self.read_final: list[bool] = []
+        self.assignments_final: list[Assignment] = []
+        self.target_indices_final: list[int] = []
+        self.target_names_final: list[str] = []
 
     def parse(self) -> None:
         if not self.tokens or self.tokens[0].kind != "word":
@@ -333,20 +356,77 @@ class _Parser:
         if self.i != len(self.tokens):
             raise _ParseError
 
-    def resolve_variables(self) -> list[Variable]:
+    def _resolve_refs(self) -> None:
+        if self.finalized:
+            return
         variables: list[Variable] = []
+        items: list[Item | None] = []
+        unresolved: list[bool] = []
+        variable_by_key: dict[tuple[object, ...], int] = {}
+        mapping: dict[int, int] = {}
+
         for ref in self.refs:
             item = find_item(self.items, ref.base, ref.qualifiers)
             ref.item = item
             if item is None:
-                variables.append(Variable(ref.name, None, ""))
+                key = ("unresolved", ref.base, ref.qualifiers, ref.subscript)
+                variable = Variable(ref.name, None, "")
+                unresolved_flag = True
             else:
-                variables.append(Variable(ref.name, item.pic, item.usage))
-        return variables
+                key = ("item", id(item), ref.subscript)
+                variable = Variable(ref.name, item.pic, item.usage)
+                unresolved_flag = False
+
+            existing = variable_by_key.get(key)
+            if existing is None:
+                index = len(variables)
+                variable_by_key[key] = index
+                variables.append(variable)
+                items.append(item)
+                unresolved.append(unresolved_flag)
+                mapping[ref.index] = index
+            else:
+                mapping[ref.index] = existing
+
+        assignments: list[Assignment] = []
+        target_indices: list[int] = []
+        target_names: list[str] = []
+        seen_targets: set[int] = set()
+        for assignment in self.assignments:
+            target = mapping[assignment.target]
+            if target in seen_targets:
+                continue
+            seen_targets.add(target)
+            assignments.append(
+                Assignment(target, _remap_expr(assignment.expr, mapping), assignment.rounded)
+            )
+            target_indices.append(target)
+            target_names.append(variables[target].name)
+
+        read_flags = [False] * len(variables)
+        for ref, was_read in zip(self.refs, self.read, strict=True):
+            if was_read:
+                read_flags[mapping[ref.index]] = True
+
+        self.variables_final = variables
+        self.items_final = items
+        self.unresolved_final = unresolved
+        self.read_final = read_flags
+        self.assignments_final = assignments
+        self.target_indices_final = target_indices
+        self.target_names_final = target_names
+        self.finalized = True
+
+    def resolve_variables(self) -> list[Variable]:
+        self._resolve_refs()
+        return list(self.variables_final)
 
     def resolution_reason(self) -> str | None:
-        for index, ref in enumerate(self.refs):
-            item = ref.item
+        self._resolve_refs()
+        for index in range(len(self.variables_final)):
+            if self.unresolved_final[index]:
+                return "unresolved name"
+            item = self.items_final[index]
             if item is None:
                 return "unresolved name"
             if item.index or item.usage == "INDEX":
@@ -358,7 +438,7 @@ class _Parser:
                 return "non-numeric field"
             if pic.kind == "scaled":
                 return "P scaling"
-            if pic.kind == "edited" and self.read[index]:
+            if pic.kind == "edited" and self.read_final[index]:
                 return "numeric-edited operand"
         return None
 
@@ -874,6 +954,10 @@ def _build_statement(
             None,
             [],
             [],
+            [],
+            [],
+            [],
+            token_list,
         )
 
     feature = _feature_reason(token_list)
@@ -890,32 +974,24 @@ def _build_statement(
             None,
             [],
             [],
+            [],
+            [],
+            [],
+            token_list,
         )
 
     parser = _Parser(token_list, items)
+    parse_failed = False
     try:
         parser.parse()
     except _ParseError:
-        variables = parser.resolve_variables()
-        return Statement(
-            program_name,
-            file,
-            line,
-            verb,
-            statement_id,
-            "unsupported",
-            "syntax",
-            size_error,
-            None,
-            variables,
-            list(parser.target_names),
-            list(parser.assignments),
-            list(parser.target_indices),
-            list(parser.read),
-        )
+        parse_failed = True
 
     variables = parser.resolve_variables()
     reason = parser.resolution_reason()
+    if parse_failed and reason is None:
+        reason = "syntax"
+
     if reason is not None:
         return Statement(
             program_name,
@@ -928,13 +1004,14 @@ def _build_statement(
             size_error,
             None,
             variables,
-            list(parser.target_names),
-            list(parser.assignments),
-            list(parser.target_indices),
-            list(parser.read),
+            list(parser.target_names_final),
+            list(parser.assignments_final),
+            list(parser.target_indices_final),
+            list(parser.read_final),
+            token_list,
         )
 
-    flags = _compute_flags(parser.assignments, variables)
+    flags = _compute_flags(parser.assignments_final, variables)
     return Statement(
         program_name,
         file,
@@ -946,10 +1023,11 @@ def _build_statement(
         size_error,
         flags,
         variables,
-        list(parser.target_names),
-        list(parser.assignments),
-        list(parser.target_indices),
-        list(parser.read),
+        list(parser.target_names_final),
+        list(parser.assignments_final),
+        list(parser.target_indices_final),
+        list(parser.read_final),
+        token_list,
     )
 
 

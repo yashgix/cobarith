@@ -4,7 +4,7 @@ from pathlib import Path
 
 from cobarith.data import parse_data
 from cobarith.source import Library, source_tokens, tokenize_file
-from cobarith.stmt import parse_statements
+from cobarith.stmt import Binary, Field, Literal, parse_statements
 
 
 def fixed(seq: str, indicator: str, code: str) -> str:
@@ -156,6 +156,43 @@ class StatementFormsTest(unittest.TestCase):
             self.assertEqual(statements[0].file, "SNIP.cpy")
             self.assertTrue(statements[0].id.startswith("PROG:SNIP.cpy:"))
 
+    def test_tokens_preserve_the_original_arithmetic_slice(self) -> None:
+        statement = parse_program(
+            NUMERIC_FIELDS,
+            ["COMPUTE WS-C = WS-A + WS-B * 2."],
+        )[0]
+
+        self.assertEqual(
+            [token.text for token in statement.tokens],
+            ["COMPUTE", "WS-C", "=", "WS-A", "+", "WS-B", "*", "2"],
+        )
+        self.assertEqual(statement.tokens[-1].kind, "num")
+
+    def test_qualified_duplicate_refs_share_one_variable(self) -> None:
+        statement = parse_program(
+            [
+                "01 TOP-G.",
+                "   05 MID-G.",
+                "      10 WS-A PIC S9(3).",
+                "01 WS-B PIC S9(3).",
+            ],
+            ["COMPUTE WS-A OF TOP-G = WS-A OF MID-G OF TOP-G + 1."],
+        )[0]
+
+        self.assertEqual(len(statement.variables), 1)
+        self.assertEqual(statement.variables[0].name, "WS-A")
+        self.assertEqual(statement.targets, ["WS-A"])
+        self.assertEqual(statement.target_indices, [0])
+        self.assertFalse(any(statement.read_flags))
+
+        assignment = statement.assignments[0]
+        self.assertIsInstance(assignment.expr, Binary)
+        assert isinstance(assignment.expr, Binary)
+        self.assertIsInstance(assignment.expr.left, Field)
+        assert isinstance(assignment.expr.left, Field)
+        self.assertEqual(assignment.expr.left.index, 0)
+        self.assertEqual(assignment.expr.right.value, 1)
+
 
 class FlagsTest(unittest.TestCase):
     def test_add_flags_size_and_sign(self) -> None:
@@ -236,6 +273,17 @@ class UnsupportedReasonsTest(unittest.TestCase):
     def test_feature_reason_precedes_resolution(self) -> None:
         statements = parse_program(self.DATA, ["COMPUTE WS-UNKNOWN = FUNCTION NUMVAL(WS-B)."])
         self.assertEqual(statements[0].reason, "intrinsic function")
+
+    def test_unresolved_name_precedes_syntax(self) -> None:
+        statements = parse_program(self.DATA, ["ADD WS-UNKNOWN TO."])
+        self.assertEqual(statements[0].status, "unsupported")
+        self.assertEqual(statements[0].reason, "unresolved name")
+        self.assertEqual([variable.name for variable in statements[0].variables], ["WS-UNKNOWN"])
+
+    def test_syntax_is_reported_when_no_earlier_problem_exists(self) -> None:
+        statements = parse_program(self.DATA, ["ADD WS-A TO."])
+        self.assertEqual(statements[0].status, "unsupported")
+        self.assertEqual(statements[0].reason, "syntax")
 
 
 if __name__ == "__main__":
