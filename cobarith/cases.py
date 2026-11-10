@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import random
-from collections.abc import Sequence
 from fractions import Fraction
+from typing import Sequence
 
 import z3
 
@@ -46,12 +46,12 @@ def _divides_by_zero(stmt: Statement, case: Sequence[int]) -> bool:
     return False
 
 
-def random_cases(stmt: Statement, n: int = 1000) -> list[list[int]]:
+def random_cases(stmt: Statement, n: int = 1000) -> list[tuple[int, ...]]:
     """Pinned random inputs, redrawing any case that divides by zero."""
     if n <= 0:
         return []
     rng = _random(f"{stmt.id}|random")
-    cases: list[list[int]] = []
+    cases: list[tuple[int, ...]] = []
     while len(cases) < n:
         index = len(cases)
         case: list[int] = []
@@ -60,7 +60,7 @@ def random_cases(stmt: Statement, n: int = 1000) -> list[list[int]]:
             low = -top if variable.pic is not None and variable.pic.signed else 0
             case.append(rng.randint(low, top))
         if not _divides_by_zero(stmt, case):
-            cases.append(case)
+            cases.append(tuple(case))
     return cases
 
 
@@ -191,7 +191,7 @@ def _solve(
     return case
 
 
-def boundary_cases(stmt: Statement) -> list[tuple[str, int, list[int]]]:
+def boundary_cases(stmt: Statement) -> list[tuple[str, int, tuple[int, ...]]]:
     """One or more z3-witnessed boundary inputs per flagged kind and target."""
     if stmt.flags is None or not stmt.assignments:
         return []
@@ -207,7 +207,7 @@ def boundary_cases(stmt: Statement) -> list[tuple[str, int, list[int]]]:
         return []
 
     rng = _random(f"{stmt.id}|boundary")
-    results: list[tuple[str, int, list[int]]] = []
+    results: list[tuple[str, int, tuple[int, ...]]] = []
     for kind in kinds:
         for target_index in range(len(stmt.assignments)):
             target = stmt.variables[stmt.assignments[target_index].target]
@@ -218,5 +218,5 @@ def boundary_cases(stmt: Statement) -> list[tuple[str, int, list[int]]]:
                 case = _solve(stmt, target_index, kind, attempt, rng)
                 if case is not None and case not in seen:
                     seen.add(case)
-                    results.append((kind, target_index, list(case)))
+                    results.append((kind, target_index, case))
     return results

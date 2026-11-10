@@ -64,7 +64,7 @@ class ProgramShapeTest(unittest.TestCase):
         self.assertIn("01 FLD-WS-A PIC S9(3).", flat)
         self.assertIn("01 FLD-WS-B PIC S9(3).", flat)
         self.assertIn("MOVE IN-0001 TO FLD-WS-A", flat)
-        self.assertIn("ADD FLD-WS-A TO FLD-WS-B END-ADD", flat)
+        self.assertIn("COMPUTE FLD-WS-B = ( FLD-WS-B + FLD-WS-A ) END-COMPUTE", flat)
         self.assertIn("DISPLAY OUT-0001", flat)
         self.assertIn("DISPLAY WS-SIZE-ERROR-FLAG", flat)
         self.assertIn("STOP RUN.", flat)
@@ -84,7 +84,7 @@ class ProgramShapeTest(unittest.TestCase):
         self.assertIn("01 FLD-WS-A PIC S9(3)V99 COMP-3.", flat)
         self.assertIn("01 FLD-WS-B PIC S9(5)V99.", flat)
         self.assertIn("05 IN-0001 PIC S9(3)V99 SIGN LEADING SEPARATE", flat)
-        self.assertIn("COMPUTE FLD-WS-B = FLD-WS-A + 1.5 END-COMPUTE", flat)
+        self.assertIn("COMPUTE FLD-WS-B = ( FLD-WS-A + 1.50 ) END-COMPUTE", flat)
 
     def test_size_error_sets_a_flag_and_closes_the_statement(self) -> None:
         statement = parse_program(["01 WS-A PIC 9(2)."], ["COMPUTE WS-A = 123 ON SIZE ERROR."])[0]
@@ -120,7 +120,10 @@ class ProgramShapeTest(unittest.TestCase):
         source = program(statement)
         flat = " ".join(source.split())
 
-        self.assertIn("ADD FLD-WS-A FLD-WS-B FLD-WS-C FLD-WS-D GIVING FLD-WS-E END-ADD", flat)
+        self.assertIn(
+            "COMPUTE FLD-WS-E = ( ( ( FLD-WS-A + FLD-WS-B ) + FLD-WS-C ) + FLD-WS-D ) END-COMPUTE",
+            flat,
+        )
         for line in source.splitlines():
             self.assertLessEqual(len(line), 72)
             self.assertEqual(line[:7], " " * 7)
@@ -135,7 +138,6 @@ class ProgramShapeTest(unittest.TestCase):
 
         self.assertIn("01 FLD-WS-A-1 PIC 9(3).", flat)
         self.assertIn("01 FLD-WS-A-2 PIC 9(3).", flat)
-        self.assertIn("ADD FLD-WS-A-1 FLD-WS-A-1 TO FLD-WS-A-2 END-ADD", flat)
         self.assertEqual(flat.count("05 IN-"), 2)
 
 

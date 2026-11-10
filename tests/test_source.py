@@ -61,7 +61,7 @@ class TokenizerTest(unittest.TestCase):
             write(
                 path,
                 [
-                    fixed("000100", " ", "01 WS-A PICTURE IS 9(02)."),
+                    fixed("000100", " ", "01 WS-A PICTURE IS 9(02) VALUE ZERO."),
                     fixed("000200", " ", "01 WS-B PIC -ZZZ,ZZ9.99."),
                 ],
             )

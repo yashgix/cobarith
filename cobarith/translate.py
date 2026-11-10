@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Sequence
-from decimal import ROUND_HALF_EVEN, Decimal, localcontext
+from decimal import ROUND_HALF_EVEN, Decimal
 from fractions import Fraction
 
 from .data import Pic, binary_bits, parse_pic
@@ -181,12 +181,11 @@ def translate(stmt: Statement, case: Sequence[int]) -> dict[str, list[int]]:
         floating = _eval_float(assignment.expr, stmt.variables, case)
         results["float_round"].append(int(round(round(floating, scale) * 10**scale)))
 
-        with localcontext() as context:
-            context.prec = max(28, 100)
-            decimal_value = _eval_decimal(assignment.expr, stmt.variables, case)
-            quantum = Decimal(1).scaleb(-scale)
-            quantized = decimal_value.quantize(quantum, rounding=ROUND_HALF_EVEN)
-            results["decimal_half_even"].append(int(quantized * (Decimal(10) ** scale)))
+        decimal_value = _eval_decimal(assignment.expr, stmt.variables, case)
+        quantum = Decimal(1).scaleb(-scale)
+        results["decimal_half_even"].append(
+            int(decimal_value.quantize(quantum, rounding=ROUND_HALF_EVEN))
+        )
 
         results["float_truncate"].append(math.trunc(floating * 10**scale))
 
