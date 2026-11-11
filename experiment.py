@@ -99,6 +99,7 @@ def _statement_record(stmt: Statement) -> dict:
                 for variable in stmt.variables
             ],
             "targets": list(stmt.targets),
+            "target_variables": list(stmt.target_indices),
             "cases_random": len(random),
             "cases_boundary": len(boundary),
             "cobol_exact_cases_differ": exact_differ,

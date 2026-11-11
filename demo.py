@@ -48,26 +48,24 @@ def _decimal(units: int, scale: int) -> str:
     return f"{sign}{digits[:-scale]}.{digits[-scale:]}"
 
 
-def _scales(record: Mapping[str, Any]) -> dict[str, int]:
-    scales: dict[str, int] = {}
+def _scales(record: Mapping[str, Any]) -> list[int]:
+    """Each variable's scale, by position: two items may share a display name."""
+    scales: list[int] = []
     for entry in record.get("variables", []):
-        if not isinstance(entry, (list, tuple)) or len(entry) < 2:
-            continue
-        name, picture = entry[0], entry[1]
-        if isinstance(name, str) and isinstance(picture, str):
-            scales[name] = parse_pic(picture).scale
+        picture = entry[1] if isinstance(entry, (list, tuple)) and len(entry) >= 2 else None
+        scales.append(parse_pic(picture).scale if isinstance(picture, str) else 0)
     return scales
 
 
-def _decimal_list(names: Sequence[str], values: Sequence[Any], scales: Mapping[str, int]) -> str:
+def _decimal_list(names: Sequence[str], values: Sequence[Any], scales: Sequence[int]) -> str:
     parts: list[str] = []
-    for name, value in zip(names, values, strict=False):
+    for name, value, scale in zip(names, values, scales, strict=False):
         try:
             units = int(value)
         except (TypeError, ValueError):
             parts.append(f"{name}={value}")
             continue
-        parts.append(f"{name}={_decimal(units, scales.get(name, 0))}")
+        parts.append(f"{name}={_decimal(units, scale)}")
     return ", ".join(parts)
 
 
@@ -75,6 +73,10 @@ def _example(record: Mapping[str, Any], names: Sequence[str]) -> str:
     scales = _scales(record)
     variables = [entry[0] for entry in record.get("variables", []) if isinstance(entry, (list, tuple)) and entry]
     targets = [str(name) for name in record.get("targets", [])]
+    positions = record.get("target_variables")
+    if positions is None:  # records written before target_variables existed: the first variable with that name
+        positions = [variables.index(name) if name in variables else -1 for name in targets]
+    target_scales = [scales[i] if 0 <= i < len(scales) else 0 for i in positions]
     for name in names:
         info = record.get(name)
         if not isinstance(info, Mapping):
@@ -86,8 +88,8 @@ def _example(record: Mapping[str, Any], names: Sequence[str]) -> str:
         cobol = example.get("cobol") or []
         translation = example.get("translation") or []
         input_text = _decimal_list(variables, inputs, scales)
-        cobol_text = _decimal_list(targets, cobol, scales)
-        translation_text = _decimal_list(targets, translation, scales)
+        cobol_text = _decimal_list(targets, cobol, target_scales)
+        translation_text = _decimal_list(targets, translation, target_scales)
         return f"{input_text} -> COBOL {cobol_text}; {name} {translation_text}"
     return ""
 
