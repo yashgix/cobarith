@@ -46,12 +46,12 @@ def _divides_by_zero(stmt: Statement, case: Sequence[int]) -> bool:
     return False
 
 
-def random_cases(stmt: Statement, n: int = 1000) -> list[tuple[int, ...]]:
+def random_cases(stmt: Statement, n: int = 1000) -> list[list[int]]:
     """Pinned random inputs, redrawing any case that divides by zero."""
     if n <= 0:
         return []
     rng = _random(f"{stmt.id}|random")
-    cases: list[tuple[int, ...]] = []
+    cases: list[list[int]] = []
     while len(cases) < n:
         index = len(cases)
         case: list[int] = []
@@ -60,7 +60,7 @@ def random_cases(stmt: Statement, n: int = 1000) -> list[tuple[int, ...]]:
             low = -top if variable.pic is not None and variable.pic.signed else 0
             case.append(rng.randint(low, top))
         if not _divides_by_zero(stmt, case):
-            cases.append(tuple(case))
+            cases.append(case)
     return cases
 
 
