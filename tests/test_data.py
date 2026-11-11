@@ -169,7 +169,8 @@ class DataItemTest(unittest.TestCase):
 
 
 class EntryBoundaryTest(unittest.TestCase):
-    """Where one data entry ends. GnuCOBOL lets the period go only before a level 01 or 77 entry."""
+    """Where one data entry ends. GnuCOBOL lets the period go when the next level number starts in Area A
+    (columns 8-11); a number in Area B belongs to the clause before it. The helper writes lines from column 8."""
 
     UNTERMINATED = {
         "a VALUE literal": ["01 G.", "    05 A PIC 9 VALUE 4", "01 B PIC 9 VALUE 7."],
@@ -193,13 +194,15 @@ class EntryBoundaryTest(unittest.TestCase):
         "an 01 before a 77": ["01 A PIC 9 VALUE 1", "77 B PIC 9 VALUE 7."],
         "level 1 written without its zero": ["01 A PIC 9 VALUE 1", "1 B PIC 9 VALUE 7."],
         "a group header": ["01 G", "01 B PIC 9 VALUE 7."],
+        "an 05 in Area A": ["01 G.", "    05 A PIC 9 VALUE 4", "05 B PIC 9 VALUE 7."],
+        "an 05 in Area A after PIC": ["01 G.", "    05 A PIC S9 SIGN LEADING SEPARATE", "05 B PIC 9."],
     }
 
-    def test_an_entry_without_its_period_ends_at_the_next_01_or_77(self) -> None:
+    def test_an_entry_without_its_period_ends_at_a_level_in_area_a(self) -> None:
         for label, storage in self.UNTERMINATED.items():
             with self.subTest(label):
                 found = items_of(program(storage))
-                self.assertIn(("B", 77 if storage[-1].startswith("77") else 1, "9"), found)
+                self.assertIn(("B", int(storage[-1].split()[0]), "9"), found)
                 if COBC and label != "a group header":  # GnuCOBOL wants a PICTURE for an empty 01 G
                     self.assertTrue(gnucobol_accepts(program(storage)), label)
 
