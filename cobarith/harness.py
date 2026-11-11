@@ -199,6 +199,8 @@ def program(stmt: Statement) -> str:
     add(f"MOVE 0 TO {_FLAG}", _STATEMENT)
     for assignment in stmt.assignments:
         add(_assignment(assignment, stmt.size_error, fields), _STATEMENT)
+    for assignment, display in zip(stmt.assignments, displays, strict=True):
+        add(f"MOVE {fields[assignment.target]} TO {display}", _STATEMENT)
     for display in displays:
         add(f"DISPLAY {display}", _STATEMENT)
     add(f"DISPLAY {_FLAG}", _STATEMENT)
