@@ -32,6 +32,8 @@ def _wrap(text: str, indent: str) -> list[str]:
     chunks: list[str] = []
     current = indent
     for word in text.split():
+        if len(indent) + len(word) > _CODE_WIDTH:
+            raise ValueError(f"{word!r} does not fit in the code area (columns 8-72)")
         if not current.strip():
             current = indent + word
         elif len(current) + 1 + len(word) <= _CODE_WIDTH:
@@ -108,33 +110,42 @@ def _declaration(variable: Variable) -> str:
 
 
 def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
-    """The statement's own tokens with each data reference renamed; tokens that touched in the source still touch."""
+    """The statement's own tokens, one space apart, with each data reference renamed.
+
+    Only a unary sign that touched its number stays glued to it (``ADD +1 TO X``): COBOL reads that as one signed
+    literal. Everything else may be split across lines by ``_wrap``.
+    """
     spans = {start: (end, index) for start, end, index in stmt.spans}
+    operands = {k for start, end, _ in stmt.spans for k in range(start, end)}
+    tokens = stmt.tokens
     words: list[str] = []
-    previous = None
     k = 0
-    while k < len(stmt.tokens):
-        first = stmt.tokens[k]
+    while k < len(tokens):
         if k in spans:
             end, index = spans[k]
-            text, last = fields[index], stmt.tokens[end - 1]
+            words.append(fields[index])
             k = end
+        elif _signed_literal(tokens, k, operands):
+            words.append(tokens[k].text + tokens[k + 1].text)
+            k += 2
         else:
-            text, last = first.text, first
+            words.append(tokens[k].text)
             k += 1
-        touching = previous is not None and (previous.file, previous.line, previous.end) == (
-            first.file,
-            first.line,
-            first.col,
-        )
-        if touching:
-            words[-1] += text
-        else:
-            words.append(text)
-        previous = last
     if stmt.size_error:
         words += ["ON", "SIZE", "ERROR", "MOVE", "1", "TO", _FLAG, f"END-{stmt.verb}"]
     return " ".join(words)
+
+
+def _signed_literal(tokens, k: int, operands: set[int]) -> bool:
+    """A + or - touching the number after it, where no operand comes before it (so it is a sign, not an operator)."""
+    sign = tokens[k]
+    if sign.kind != "sep" or sign.text not in ("+", "-") or k + 1 >= len(tokens):
+        return False
+    number = tokens[k + 1]
+    touching = number.kind == "num" and (sign.file, sign.line, sign.end) == (number.file, number.line, number.col)
+    before = tokens[k - 1] if k else None
+    operand_before = k - 1 in operands or (before is not None and (before.kind == "num" or before.text == ")"))
+    return touching and not operand_before
 
 
 def program(stmt: Statement) -> str:
