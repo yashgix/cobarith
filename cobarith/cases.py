@@ -189,7 +189,7 @@ def _solve(
     return case
 
 
-def boundary_cases(stmt: Statement) -> list[tuple[str, int, tuple[int, ...]]]:
+def boundary_cases(stmt: Statement) -> list[tuple[str, int, list[int]]]:
     """One or more z3-witnessed boundary inputs per flagged kind and target."""
     if stmt.flags is None or not stmt.assignments:
         return []
@@ -205,7 +205,7 @@ def boundary_cases(stmt: Statement) -> list[tuple[str, int, tuple[int, ...]]]:
         return []
 
     rng = _random(f"{stmt.id}|boundary")
-    results: list[tuple[str, int, tuple[int, ...]]] = []
+    results: list[tuple[str, int, list[int]]] = []
     for kind in kinds:
         for target_index in range(len(stmt.assignments)):
             target = stmt.variables[stmt.assignments[target_index].target]
@@ -216,5 +216,5 @@ def boundary_cases(stmt: Statement) -> list[tuple[str, int, tuple[int, ...]]]:
                 case = _solve(stmt, target_index, kind, attempt, rng)
                 if case is not None and case not in seen:
                     seen.add(case)
-                    results.append((kind, target_index, case))
+                    results.append((kind, target_index, list(case)))
     return results
