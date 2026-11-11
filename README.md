@@ -47,7 +47,8 @@ in production data.
 ## Running it
 
 ```sh
-make test                                     # unittest + ruff
+make test                                     # unittest
+make lint                                     # ruff check and format
 python experiment.py --out results/metrics.json
 python demo.py                                # short console summary
 python demo.py --readme README.md --out README.md
