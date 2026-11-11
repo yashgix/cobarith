@@ -1,5 +1,6 @@
 import os
 import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,7 @@ from cobarith.data import parse_data
 from cobarith.harness import program, run
 from cobarith.source import tokenize_file
 from cobarith.stmt import parse_statements
+from cobarith.translate import translate
 
 COBC = os.environ.get("ARCTURUS_COBC") or shutil.which("cobc")
 
@@ -35,6 +37,21 @@ def program_lines(data: list[str], procedure: list[str]) -> list[str]:
     for number, code in enumerate(procedure, 91):
         lines.append(fixed(f"{number:06d}", " ", code))
     return lines
+
+
+def compiles(data: list[str], procedure: list[str]) -> bool:
+    """Whether GnuCOBOL accepts the statements as written."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "TEST.cbl"
+        write(path, program_lines(data, [*procedure, "STOP RUN."]))
+        return subprocess.run([COBC, "-std=ibm", "-fsyntax-only", str(path)], capture_output=True).returncode == 0
+
+
+def agrees_with_gnucobol(test: unittest.TestCase, statement, case: tuple) -> None:
+    """The model's stored units (cobol_exact) equal what GnuCOBOL stores for the same case."""
+    test.assertEqual(statement.status, "harnessed", statement.reason)
+    expected = tuple(translate(statement, case)["cobol_exact"])
+    test.assertEqual(run(statement, [case]), [(expected, False)])
 
 
 def parse_program(data: list[str], procedure: list[str], program_name: str = "TEST") -> list:
@@ -262,3 +279,33 @@ class OtherVerbsRunTest(unittest.TestCase):
     def test_subtract_giving_and_add_to_two_targets(self) -> None:
         self.check("SUBTRACT WS-A FROM WS-B GIVING WS-C.", (15, 100, 0), (85,))
         self.check("ADD WS-A TO WS-C WS-D.", (15, 100, 200), (115, 215))
+
+
+@unittest.skipUnless(COBC, "no GnuCOBOL compiler available")
+class LiteralOperandTest(unittest.TestCase):
+    """Numeric literals and ZERO are operands in every form, also right before GIVING."""
+
+    FIELDS = ["01 WS-A PIC S9(3)V9.", "01 WS-C PIC S9(5)V99."]
+
+    def test_literals_before_giving_agree_with_gnucobol(self) -> None:
+        for text in (
+            "SUBTRACT WS-A FROM 100 GIVING WS-C.",
+            "SUBTRACT 1 FROM ZERO GIVING WS-C.",
+            "SUBTRACT WS-A FROM -5 GIVING WS-C.",
+            "MULTIPLY WS-A BY 2.5 GIVING WS-C.",
+            "MULTIPLY 2 BY 3 GIVING WS-C.",
+            "DIVIDE WS-A INTO 1000 GIVING WS-C.",
+            "DIVIDE WS-A BY 4 GIVING WS-C ROUNDED.",
+            "DIVIDE 2 INTO 8 GIVING WS-C.",
+            "DIVIDE 7 BY 2 GIVING WS-C.",
+        ):
+            with self.subTest(text):
+                statement = parse_program(self.FIELDS, [text])[0]
+                case = tuple(-125 if v.name == "WS-A" else 0 for v in statement.variables)
+                agrees_with_gnucobol(self, statement, case)
+
+    def test_a_literal_cannot_receive_the_result(self) -> None:
+        for text in ("MULTIPLY WS-A BY 3.", "DIVIDE WS-A INTO 8.", "SUBTRACT WS-A FROM 5."):
+            with self.subTest(text):
+                self.assertEqual(parse_program(self.FIELDS, [text])[0].reason, "syntax")
+                self.assertFalse(compiles(self.FIELDS, [text]))

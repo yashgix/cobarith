@@ -110,6 +110,8 @@ REASONS = (
 
 _VERBS = {"ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE"}
 
+_ZEROS = ("ZERO", "ZEROS", "ZEROES")
+
 _TERMINATORS = {
     "ACCEPT",
     "ADD",
@@ -490,7 +492,7 @@ class _Parser:
             return self._parse_number()
         if token.kind == "num":
             return self._parse_number()
-        if token.kind == "word" and token.text in ("ZERO", "ZEROS", "ZEROES"):
+        if token.kind == "word" and token.text in _ZEROS:
             self.i += 1
             return Literal(Fraction(0), 0)
         if token.kind == "word" and token.text not in _RESERVED:
@@ -498,6 +500,22 @@ class _Parser:
             self._mark_read(ref)
             return Field(ref.index)
         raise _ParseError
+
+    def _literal_ahead(self) -> bool:
+        token = self._current()
+        return token is not None and (
+            token.kind == "num" or self._next_num_adjacent() or token.kind == "word" and token.text in _ZEROS
+        )
+
+    def _giving_operand(self) -> tuple[Expr, _Ref | None]:
+        """After FROM, BY or INTO: a field, or a literal or ZERO when GIVING follows (else it would receive)."""
+        if not self._literal_ahead():
+            ref = self._parse_ref()
+            return Field(ref.index), ref
+        value = self._parse_value()
+        if not self._is_word("GIVING"):
+            raise _ParseError
+        return value, None
 
     def _parse_values(self, stop_words: set[str]) -> list[Expr]:
         values: list[Expr] = []
@@ -638,18 +656,22 @@ class _Parser:
         if not values or not self._is_word("FROM"):
             raise _ParseError
         self.i += 1
-        from_refs = self._parse_targets(stop_words={"GIVING"}, read=True)
-        if not from_refs:
-            raise _ParseError
+        if self._literal_ahead():
+            minuend, from_refs = self._giving_operand()[0], []
+        else:
+            from_refs = self._parse_targets(stop_words={"GIVING"}, read=True)
+            if not from_refs:
+                raise _ParseError
+            minuend = Field(from_refs[0][0].index)
 
         if self._is_word("GIVING"):
-            if len(from_refs) != 1:
+            if len(from_refs) > 1:
                 raise _ParseError
             self.i += 1
             giving = self._parse_targets(read=False)
             if not giving:
                 raise _ParseError
-            expr = Binary("-", Field(from_refs[0][0].index), _sum_expr(values))
+            expr = Binary("-", minuend, _sum_expr(values))
             for ref, rounded in giving:
                 self._add_assignment(ref, expr, rounded)
         else:
@@ -663,15 +685,16 @@ class _Parser:
         if not self._is_word("BY"):
             raise _ParseError
         self.i += 1
-        ref = self._parse_ref()
+        right, ref = self._giving_operand()
 
         if self._is_word("GIVING"):
-            self._mark_read(ref)
+            if ref is not None:
+                self._mark_read(ref)
             self.i += 1
             giving = self._parse_targets(read=False)
             if not giving:
                 raise _ParseError
-            expr = Binary("*", left, Field(ref.index))
+            expr = Binary("*", left, right)
             for target, rounded in giving:
                 self._add_assignment(target, expr, rounded)
         else:
@@ -688,14 +711,15 @@ class _Parser:
 
         if self._is_word("INTO"):
             self.i += 1
-            ref = self._parse_ref()
+            dividend, ref = self._giving_operand()
             if self._is_word("GIVING"):
-                self._mark_read(ref)
+                if ref is not None:
+                    self._mark_read(ref)
                 self.i += 1
                 giving = self._parse_targets(read=False)
                 if not giving:
                     raise _ParseError
-                expr = Binary("/", Field(ref.index), left)
+                expr = Binary("/", dividend, left)
                 for target, rounded in giving:
                     self._add_assignment(target, expr, rounded)
             else:
@@ -709,15 +733,16 @@ class _Parser:
 
         if self._is_word("BY"):
             self.i += 1
-            ref = self._parse_ref()
+            divisor, ref = self._giving_operand()
             if not self._is_word("GIVING"):
                 raise _ParseError
-            self._mark_read(ref)
+            if ref is not None:
+                self._mark_read(ref)
             self.i += 1
             giving = self._parse_targets(read=False)
             if not giving:
                 raise _ParseError
-            expr = Binary("/", left, Field(ref.index))
+            expr = Binary("/", left, divisor)
             for target, rounded in giving:
                 self._add_assignment(target, expr, rounded)
             return
