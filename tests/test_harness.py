@@ -210,3 +210,55 @@ class RunTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SourceFormatTest(unittest.TestCase):
+    """Renamed statements must stay valid fixed-format COBOL and mean what they meant."""
+
+    FIELDS = [f"01 WS-{c} PIC S9(3)." for c in "ABCDEFGHI"] + ["01 WS-T PIC S9(5)."]
+
+    def test_a_long_unspaced_expression_stays_in_the_code_area_and_runs(self) -> None:
+        statement = parse_program(self.FIELDS, ["COMPUTE WS-T=WS-A+WS-B+WS-C+WS-D+WS-E+WS-F+WS-G+WS-H+WS-I."])[0]
+        source = program(statement)
+        for line in source.splitlines():
+            self.assertLessEqual(len(line), 72, line)
+        case = (0, *range(1, 10))
+        self.assertEqual(run(statement, [case]), [((45,), False)])
+
+    def test_a_touching_minus_after_an_operand_is_subtraction(self) -> None:
+        statement = parse_program(["01 WS-A PIC S9(3).", "01 WS-T PIC S9(3)."], ["COMPUTE WS-T = WS-A -1."])[0]
+        self.assertEqual(run(statement, [(0, 10)]), [((9,), False)])
+
+    def test_a_unary_sign_stays_on_its_literal(self) -> None:
+        statement = parse_program(["01 WS-A PIC S9(3)."], ["ADD +1 TO WS-A."])[0]
+        self.assertIn("ADD +1 TO", " ".join(program(statement).split()))
+        self.assertEqual(run(statement, [(41,)]), [((42,), False)])
+
+    def test_a_word_that_cannot_fit_is_refused(self) -> None:
+        from cobarith.harness import _wrap
+
+        with self.assertRaises(ValueError):
+            _wrap("X" * 70, " " * 4)
+
+
+class OtherVerbsRunTest(unittest.TestCase):
+    """Verbs other than COMPUTE, checked against GnuCOBOL rather than only parsed."""
+
+    FIELDS = ["01 WS-A PIC S9(3)V9.", "01 WS-B PIC S9(3)V9.", "01 WS-C PIC S9(5)V9.", "01 WS-D PIC S9(5)V9."]
+
+    def check(self, statement_text: str, case: tuple, expected: tuple) -> None:
+        statement = parse_program(self.FIELDS, [statement_text])[0]
+        self.assertEqual(statement.status, "harnessed", statement.reason)
+        self.assertEqual(run(statement, [case]), [(expected, False)])
+
+    def test_multiply_by_and_giving(self) -> None:
+        self.check("MULTIPLY WS-A BY WS-B.", (25, 40), (100,))
+        self.check("MULTIPLY WS-A BY WS-B GIVING WS-C.", (25, 40, 0), (100,))
+
+    def test_divide_into_and_by_giving(self) -> None:
+        self.check("DIVIDE WS-A INTO WS-B.", (30, 100), (33,))
+        self.check("DIVIDE WS-A BY WS-B GIVING WS-C ROUNDED.", (100, 30, 0), (33,))
+
+    def test_subtract_giving_and_add_to_two_targets(self) -> None:
+        self.check("SUBTRACT WS-A FROM WS-B GIVING WS-C.", (15, 100, 0), (85,))
+        self.check("ADD WS-A TO WS-C WS-D.", (15, 100, 200), (115, 215))
