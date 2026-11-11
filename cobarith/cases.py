@@ -46,21 +46,29 @@ def _divides_by_zero(stmt: Statement, case: Sequence[int]) -> bool:
     return False
 
 
+MAX_REDRAWS = 1000
+
+
 def random_cases(stmt: Statement, n: int = 1000) -> list[list[int]]:
-    """Pinned random inputs, redrawing any case that divides by zero."""
+    """Pinned random inputs, redrawing any case that divides by zero. A divisor that is zero in every draw (DIVIDE
+    ZERO INTO A GIVING T) stops after MAX_REDRAWS redraws in a row with the cases found so far, instead of forever."""
     if n <= 0:
         return []
     rng = _random(f"{stmt.id}|random")
     cases: list[list[int]] = []
-    while len(cases) < n:
+    redraws = 0
+    while len(cases) < n and redraws < MAX_REDRAWS:
         index = len(cases)
         case: list[int] = []
         for variable in stmt.variables:
             top = _top_for(variable.pic, index)
             low = -top if variable.pic is not None and variable.pic.signed else 0
             case.append(rng.randint(low, top))
-        if not _divides_by_zero(stmt, case):
+        if _divides_by_zero(stmt, case):
+            redraws += 1
+        else:
             cases.append(case)
+            redraws = 0
     return cases
 
 

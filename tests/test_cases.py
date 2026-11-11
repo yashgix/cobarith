@@ -1,3 +1,4 @@
+import signal
 import tempfile
 import unittest
 from fractions import Fraction
@@ -77,6 +78,27 @@ class RandomCasesTest(unittest.TestCase):
         for case in cases:
             self.assertNotEqual(case[divisor], 0)
             exact_results(statement, case)
+
+    def test_a_divisor_that_is_always_zero_ends_without_cases(self) -> None:
+        def stuck(signum, frame):
+            raise TimeoutError("random_cases kept redrawing")
+
+        previous = signal.signal(signal.SIGALRM, stuck)
+        self.addCleanup(signal.signal, signal.SIGALRM, previous)
+        fields = ["01 WS-A PIC S9(3).", "01 WS-B PIC S9(3).", "01 WS-T PIC S9(5)."]
+        for text in (
+            "DIVIDE ZERO INTO WS-A GIVING WS-T.",
+            "DIVIDE WS-A BY 0 GIVING WS-T.",
+            "COMPUTE WS-T = WS-A / (WS-B - WS-B).",
+        ):
+            with self.subTest(text):
+                statement = parse_program(fields, [text])[0]
+                self.assertEqual(statement.status, "harnessed", statement.reason)
+                signal.alarm(20)
+                try:
+                    self.assertEqual(random_cases(statement, n=5), [])
+                finally:
+                    signal.alarm(0)
 
 
 class BoundaryCasesTest(unittest.TestCase):
