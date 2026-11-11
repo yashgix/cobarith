@@ -11,7 +11,6 @@ import os
 import subprocess
 import tempfile
 from collections.abc import Sequence
-from fractions import Fraction
 from pathlib import Path
 
 from .data import Pic, binary_bits
@@ -123,8 +122,8 @@ def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
         else:
             text, last = first.text, first
             k += 1
-        glued = previous is not None and (previous.file, previous.line, previous.end) == (first.file, first.line, first.col)
-        if glued:
+        touching = (previous.file, previous.line, previous.end) == (first.file, first.line, first.col) if previous else False
+        if touching:
             words[-1] += text
         else:
             words.append(text)
