@@ -134,9 +134,11 @@ different witnesses, so boundary counts can shift while every random-case count 
 `program(stmt)` re-emits the statement as generated GnuCOBOL.
 
 - Every variable becomes a level-01 field declaring the statement's own picture text and usage.
-- Expressions are re-rendered from the parsed assignments, one `COMPUTE` per receiving field, so the generated code
-  has the same interim results, the same `ROUNDED` phrase and the same size-error behaviour, without needing the
-  original tokens (and without `EXEC` blocks, file sections or CICS).
+- The statement runs as written: its own tokens, one space apart, with each data reference (qualifiers and
+  subscripts included) renamed to its field, so GnuCOBOL applies the verb's own rules. Only a unary sign that touched
+  its number stays glued (`ADD +1`), because COBOL reads that as one literal; everything else may wrap, and a word
+  that can't fit in columns 8-72 is refused rather than written past column 72. No `EXEC` blocks, file sections or
+  CICS are needed.
 - Input cases come from `cases.txt`, each variable as sign-leading-separate signed digits, moved into the field
   before the statement runs.
 - Each receiving field is displayed afterwards through a signed display field wide enough for a binary field's whole
@@ -195,9 +197,10 @@ number, which is why the README can be regenerated safely after every experiment
 - **One statement at a time.** No data flow, so a receiving field's prior value and the operands' values come from
   the case. Cheaper and reproducible, and enough to find the storage differences; a whole-program trace would need a
   working-storage model and a lot more runtime.
-- **Parse, do not copy.** Statements are re-parsed and re-rendered rather than pasted verbatim, so the harness needs
-  no CICS, MQ or file handling. The cost is that a generated form differing from the original would be measured
-  wrongly; the tests pin the shapes that matter.
+- **Run the statement as written.** The harness keeps the statement's own tokens and renames only its data
+  references, so no re-rendering can change what is measured, and no CICS, MQ or file handling is needed. The cost is
+  that statements whose operands can't be harnessed (intrinsic functions, MQ fields from missing system copybooks)
+  are listed, not run.
 - **Wide inputs.** Random cases span the picture ranges instead of resembling real transaction data. That maximises
   the chance of finding a difference per statement; it means counts are exposure, not rates.
 - **z3 with a rlimit** rather than a full bit-vector encoding: the exact arithmetic is done in rationals and the

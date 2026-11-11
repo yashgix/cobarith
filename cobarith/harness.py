@@ -1,8 +1,7 @@
 """GnuCOBOL harness: one generated program per statement, run over its cases.
 
-``Statement`` keeps the parsed arithmetic rather than the original tokens, so a statement is re-emitted here as
-one ``COMPUTE`` per receiving field. That reproduces the parsed interim results, the ``ROUNDED`` phrase and the
-size-error behaviour of the source statement, which is all the storage rule depends on.
+The statement runs as written: its own tokens, one space apart, with each data reference renamed to a harness
+field, so GnuCOBOL applies the verb's own rules (GIVING forms, several receiving fields, ROUNDED, size error).
 """
 
 from __future__ import annotations
