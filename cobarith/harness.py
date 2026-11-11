@@ -111,11 +111,11 @@ def _declaration(variable: Variable) -> str:
 def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
     """The statement's own tokens, one space apart, with each data reference renamed.
 
-    Only a unary sign that touched its number stays glued to it (``ADD +1 TO X``): COBOL reads that as one signed
-    literal. Everything else may be split across lines by ``_wrap``.
+    A sign that touched its number stays glued to it (``ADD A -1 TO X``): COBOL reads that as one signed literal, so
+    splitting it would change the statement. Other tokens touch without meaning (``A+B``) and may be split across
+    lines by ``_wrap``.
     """
     spans = {start: (end, index) for start, end, index in stmt.spans}
-    operands = {k for start, end, _ in stmt.spans for k in range(start, end)}
     tokens = stmt.tokens
     words: list[str] = []
     k = 0
@@ -124,7 +124,7 @@ def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
             end, index = spans[k]
             words.append(fields[index])
             k = end
-        elif _signed_literal(tokens, k, operands):
+        elif _signed_literal(tokens, k):
             words.append(tokens[k].text + tokens[k + 1].text)
             k += 2
         else:
@@ -135,16 +135,13 @@ def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
     return " ".join(words)
 
 
-def _signed_literal(tokens, k: int, operands: set[int]) -> bool:
-    """A + or - touching the number after it, where no operand comes before it (so it is a sign, not an operator)."""
+def _signed_literal(tokens, k: int) -> bool:
+    """A + or - touching the number after it: one signed literal, wherever it stands."""
     sign = tokens[k]
     if sign.kind != "sep" or sign.text not in ("+", "-") or k + 1 >= len(tokens):
         return False
     number = tokens[k + 1]
-    touching = number.kind == "num" and (sign.file, sign.line, sign.end) == (number.file, number.line, number.col)
-    before = tokens[k - 1] if k else None
-    operand_before = k - 1 in operands or (before is not None and (before.kind == "num" or before.text == ")"))
-    return touching and not operand_before
+    return number.kind == "num" and (sign.file, sign.line, sign.end) == (number.file, number.line, number.col)
 
 
 def program(stmt: Statement) -> str:

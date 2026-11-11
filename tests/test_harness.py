@@ -242,9 +242,33 @@ class SourceFormatTest(unittest.TestCase):
         case = (0, *range(1, 10))
         self.assertEqual(run(statement, [case]), [((45,), False)])
 
-    def test_a_touching_minus_after_an_operand_is_subtraction(self) -> None:
-        statement = parse_program(["01 WS-A PIC S9(3).", "01 WS-T PIC S9(3)."], ["COMPUTE WS-T = WS-A -1."])[0]
-        self.assertEqual(run(statement, [(0, 10)]), [((9,), False)])
+    def test_a_touching_sign_after_an_operand_is_a_literal_in_a_list(self) -> None:
+        fields = ["01 WS-A PIC S9(3).", "01 WS-B PIC S9(3).", "01 WS-T PIC S9(5)."]
+        for text in ("ADD WS-A -1 TO WS-B.", "SUBTRACT WS-A -1 FROM WS-B.", "ADD WS-A +2 WS-B GIVING WS-T."):
+            with self.subTest(text):
+                statement = parse_program(fields, [text])[0]
+                self.assertIn(text.split()[2], program(statement).split())
+                case = tuple({"WS-A": 10, "WS-B": 20, "WS-T": 0}[v.name] for v in statement.variables)
+                agrees_with_gnucobol(self, statement, case)
+
+    def test_a_signed_literal_where_an_operator_belongs_is_refused(self) -> None:
+        fields = ["01 WS-A PIC S9(3).", "01 WS-T PIC S9(5)."]
+        for text in (
+            "COMPUTE WS-T = WS-A -1.",
+            "COMPUTE WS-T = WS-A+1.",
+            "COMPUTE WS-T = (WS-A)-1.",
+            "COMPUTE WS-T = 5 -1.",
+        ):
+            with self.subTest(text):
+                self.assertEqual(parse_program(fields, [text])[0].reason, "syntax")
+                if COBC:
+                    self.assertFalse(compiles(fields, [text]))
+
+    def test_a_sign_after_an_operator_is_the_literal_s_own(self) -> None:
+        fields = ["01 WS-A PIC S9(3).", "01 WS-T PIC S9(5)."]
+        for text in ("COMPUTE WS-T = WS-A - -1.", "COMPUTE WS-T = WS-A*-1.", "COMPUTE WS-T = WS-A / +2."):
+            with self.subTest(text):
+                agrees_with_gnucobol(self, parse_program(fields, [text])[0], (0, 10))
 
     def test_a_unary_sign_stays_on_its_literal(self) -> None:
         statement = parse_program(["01 WS-A PIC S9(3)."], ["ADD +1 TO WS-A."])[0]

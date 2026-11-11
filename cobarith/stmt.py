@@ -559,6 +559,8 @@ class _Parser:
             token = self._current()
             if token is None or token.kind != "sep" or token.text not in ("+", "-"):
                 return left
+            if self._next_num_adjacent():  # `A -1`: a signed literal where an operator belongs, as GnuCOBOL reads it
+                raise _ParseError
             op = token.text
             self.i += 1
             right = self._parse_multiplicative()
