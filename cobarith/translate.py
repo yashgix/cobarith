@@ -184,7 +184,7 @@ def translate(stmt: Statement, case: Sequence[int]) -> dict[str, list[int]]:
         decimal_value = _eval_decimal(assignment.expr, stmt.variables, case)
         quantum = Decimal(1).scaleb(-scale)
         results["decimal_half_even"].append(
-            int(decimal_value.quantize(quantum, rounding=ROUND_HALF_EVEN))
+            int(decimal_value.quantize(quantum, rounding=ROUND_HALF_EVEN).scaleb(scale))
         )
 
         results["float_truncate"].append(math.trunc(floating * 10**scale))
