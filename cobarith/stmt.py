@@ -573,29 +573,35 @@ class _Parser:
         for ref, rounded in targets:
             self._add_assignment(ref, expr, rounded)
 
+    def _giving_ahead(self) -> bool:
+        return any(t.kind == "word" and t.text == "GIVING" for t in self.tokens[self.i :])
+
     def _parse_add(self) -> None:
         self.i = 1
         values = self._parse_values({"TO", "GIVING"})
         if not values:
             raise _ParseError
 
-        if self._is_word("TO"):
+        if self._is_word("TO") and self._giving_ahead():
+            self.i += 1
+            more = self._parse_values({"GIVING"})
+            if not more or not self._is_word("GIVING"):
+                raise _ParseError
+            self.i += 1
+            giving = self._parse_targets(read=False)
+            if not giving:
+                raise _ParseError
+            total = _sum_expr(values + more)
+            for ref, rounded in giving:
+                self._add_assignment(ref, total, rounded)
+        elif self._is_word("TO"):
             self.i += 1
             targets = self._parse_targets(stop_words={"GIVING"}, read=True)
             if not targets:
                 raise _ParseError
-            if self._is_word("GIVING"):
-                self.i += 1
-                giving = self._parse_targets(read=False)
-                if not giving:
-                    raise _ParseError
-                total = _sum_expr(values + [Field(ref.index) for ref, _ in targets])
-                for ref, rounded in giving:
-                    self._add_assignment(ref, total, rounded)
-            else:
-                total = _sum_expr(values)
-                for ref, rounded in targets:
-                    self._add_assignment(ref, Binary("+", Field(ref.index), total), rounded, read=True)
+            total = _sum_expr(values)
+            for ref, rounded in targets:
+                self._add_assignment(ref, Binary("+", Field(ref.index), total), rounded, read=True)
         elif self._is_word("GIVING"):
             self.i += 1
             giving = self._parse_targets(read=False)
