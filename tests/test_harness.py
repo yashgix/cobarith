@@ -64,7 +64,7 @@ class ProgramShapeTest(unittest.TestCase):
         self.assertIn("01 FLD-WS-A PIC S9(3).", flat)
         self.assertIn("01 FLD-WS-B PIC S9(3).", flat)
         self.assertIn("MOVE IN-0001 TO FLD-WS-A", flat)
-        self.assertIn("COMPUTE FLD-WS-B = ( FLD-WS-B + FLD-WS-A ) END-COMPUTE", flat)
+        self.assertIn("ADD FLD-WS-A TO FLD-WS-B", flat)
         self.assertIn("DISPLAY OUT-0001", flat)
         self.assertIn("DISPLAY WS-SIZE-ERROR-FLAG", flat)
         self.assertIn("STOP RUN.", flat)
@@ -83,8 +83,8 @@ class ProgramShapeTest(unittest.TestCase):
 
         self.assertIn("01 FLD-WS-A PIC S9(3)V99 COMP-3.", flat)
         self.assertIn("01 FLD-WS-B PIC S9(5)V99.", flat)
-        self.assertIn("05 IN-0001 PIC S9(3)V99 SIGN LEADING SEPARATE", flat)
-        self.assertIn("COMPUTE FLD-WS-B = ( FLD-WS-A + 1.50 ) END-COMPUTE", flat)
+        self.assertIn("05 IN-0002 PIC S9(3)V9(2) SIGN LEADING SEPARATE", flat)
+        self.assertIn("COMPUTE FLD-WS-B = FLD-WS-A + 1.5", flat)
 
     def test_size_error_sets_a_flag_and_closes_the_statement(self) -> None:
         statement = parse_program(["01 WS-A PIC 9(2)."], ["COMPUTE WS-A = 123 ON SIZE ERROR."])[0]
@@ -121,7 +121,7 @@ class ProgramShapeTest(unittest.TestCase):
         flat = " ".join(source.split())
 
         self.assertIn(
-            "COMPUTE FLD-WS-E = ( ( ( FLD-WS-A + FLD-WS-B ) + FLD-WS-C ) + FLD-WS-D ) END-COMPUTE",
+            "ADD FLD-WS-A FLD-WS-B FLD-WS-C FLD-WS-D GIVING FLD-WS-E",
             flat,
         )
         for line in source.splitlines():
@@ -189,15 +189,15 @@ class RunTest(unittest.TestCase):
             ["01 WS-A PIC S9(3)V99.", "01 WS-B PIC S9(2)V99."],
             ["COMPUTE WS-B = WS-A / 3."],
         )[0]
-        self.assertEqual(run(statement, [(100, 0)]), [((33,), False)])
+        self.assertEqual(run(statement, [(0, 100)]), [((33,), False)])
 
     def test_rounded_halves_go_away_from_zero(self) -> None:
         data = ["01 WS-A PIC S9(3)V99.", "01 WS-B PIC S9(2)V99."]
         rounded = parse_program(data, ["COMPUTE WS-B ROUNDED = WS-A / 2."])[0]
         plain = parse_program(data, ["COMPUTE WS-B = WS-A / 2."])[0]
 
-        self.assertEqual(run(rounded, [(125, 0)]), [((63,), False)])
-        self.assertEqual(run(plain, [(125, 0)]), [((62,), False)])
+        self.assertEqual(run(rounded, [(0, 125)]), [((63,), False)])
+        self.assertEqual(run(plain, [(0, 125)]), [((62,), False)])
 
     def test_several_cases_run_in_order(self) -> None:
         statement = parse_program(

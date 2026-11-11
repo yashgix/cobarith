@@ -74,7 +74,7 @@ class TokenizerTest(unittest.TestCase):
             picture_index = texts.index("PICTURE")
             self.assertEqual(tokens[picture_index + 1].kind, "pic")
             self.assertEqual(tokens[picture_index + 1].text, "9(02)")
-            self.assertEqual(tokens[picture_index + 2].text, ".")
+            self.assertEqual(tokens[picture_index + 2].text, "VALUE")
 
             self.assertIn("-ZZZ,ZZ9.99", texts)
             self.assertEqual(texts.count("."), 2)
