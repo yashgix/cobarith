@@ -188,6 +188,20 @@ class LibraryTest(unittest.TestCase):
             self.assertIn("WS-OLDER", texts)
             self.assertNotIn("WS-OLD", texts)
 
+    def test_quoted_member_name_dcl_file_and_literal_replacing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write(root / "decl" / "TRTYP.DCL", [fixed("000100", " ", "01 WS-CODE PIC X(3) VALUE 'OLD'.")])
+            program = root / "PROG.cbl"
+            write(program, [fixed("000100", " ", "COPY 'trtyp' REPLACING 'OLD' BY 'NEW'.")])
+
+            library = Library(root)
+            texts = [t.text for t in source_tokens(program, library)]
+            self.assertIn("WS-CODE", texts)
+            self.assertIn("'NEW'", texts)
+            self.assertNotIn("'OLD'", texts)
+            self.assertEqual(library.missing, set())
+
     def test_exec_sql_include(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
