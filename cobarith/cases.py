@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import random
+from collections.abc import Sequence
 from fractions import Fraction
-from typing import Sequence
 
 import z3
 

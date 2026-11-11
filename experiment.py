@@ -5,8 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 from cobarith import DATA_DIR
 from cobarith.cases import boundary_cases, random_cases

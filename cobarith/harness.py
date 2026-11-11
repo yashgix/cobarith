@@ -122,7 +122,11 @@ def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
         else:
             text, last = first.text, first
             k += 1
-        touching = (previous.file, previous.line, previous.end) == (first.file, first.line, first.col) if previous else False
+        touching = previous is not None and (previous.file, previous.line, previous.end) == (
+            first.file,
+            first.line,
+            first.col,
+        )
         if touching:
             words[-1] += text
         else:
