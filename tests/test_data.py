@@ -1,3 +1,6 @@
+import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -13,6 +16,41 @@ def fixed(seq: str, indicator: str, code: str) -> str:
 def write(path: Path, lines: list[str]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+COBC = os.environ.get("ARCTURUS_COBC") or shutil.which("cobc")
+
+
+def program(storage: list[str], files: list[str] = ()) -> list[str]:
+    head = ["IDENTIFICATION DIVISION.", "PROGRAM-ID. TEST."]
+    if files:
+        head += [
+            "ENVIRONMENT DIVISION.",
+            "INPUT-OUTPUT SECTION.",
+            "FILE-CONTROL.",
+            "    SELECT IN-FILE ASSIGN TO 'IN.DAT' ORGANIZATION IS SEQUENTIAL.",
+            "DATA DIVISION.",
+            "FILE SECTION.",
+            *files,
+        ]
+    else:
+        head.append("DATA DIVISION.")
+    body = head + ["WORKING-STORAGE SECTION.", *storage, "PROCEDURE DIVISION.", "    STOP RUN."]
+    return [fixed(f"{n:06d}", " ", line) for n, line in enumerate(body, 1)]
+
+
+def items_of(lines: list[str]) -> list[tuple[str, int, str | None]]:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "T.cbl"
+        write(path, lines)
+        return [(i.name, i.level, i.pic.text if i.pic else None) for i in parse_data(tokenize_file(path))]
+
+
+def gnucobol_accepts(lines: list[str]) -> bool:
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "T.cbl"
+        write(path, lines)
+        return subprocess.run([COBC, "-std=ibm", "-fsyntax-only", str(path)], capture_output=True).returncode == 0
 
 
 class PicTest(unittest.TestCase):
@@ -128,6 +166,72 @@ class DataItemTest(unittest.TestCase):
     def test_data_division_exposes_items(self) -> None:
         self.assertEqual(len(self.division.items), len(self.division))
         self.assertTrue(any(item.name == "TOP-G" for item in self.division.items))
+
+
+class EntryBoundaryTest(unittest.TestCase):
+    """Where one data entry ends. GnuCOBOL lets the period go only before a level 01 or 77 entry."""
+
+    UNTERMINATED = {
+        "a VALUE literal": ["01 G.", "    05 A PIC 9 VALUE 4", "01 B PIC 9 VALUE 7."],
+        "VALUE ZERO": ["01 A PIC 9 VALUE ZERO", "01 B PIC 9 VALUE 7."],
+        "a quoted VALUE": ["01 A PIC X(3) VALUE 'ABC'", "01 B PIC 9 VALUE 7."],
+        "a negative VALUE": ["01 A PIC S9 VALUE -5", "01 B PIC 9 VALUE 7."],
+        "an 88 with a VALUES list": [
+            "01 G.",
+            "    05 A PIC 9 VALUE 2.",
+            "      88 A-OK VALUES 1 2 3",
+            "01 B PIC 9 VALUE 7.",
+        ],
+        "OCCURS ... DEPENDING ON": [
+            "01 N PIC 9 VALUE 3.",
+            "01 G.",
+            "    05 A PIC 9 OCCURS 1 TO 5 TIMES DEPENDING ON N",
+            "01 B PIC 9 VALUE 7.",
+        ],
+        "INDEXED BY": ["01 G.", "    05 A PIC 9 OCCURS 3 INDEXED BY IX", "01 B PIC 9 VALUE 7."],
+        "a 77 before a 77": ["77 A PIC 9 VALUE 4", "77 B PIC 9 VALUE 7."],
+        "an 01 before a 77": ["01 A PIC 9 VALUE 1", "77 B PIC 9 VALUE 7."],
+        "level 1 written without its zero": ["01 A PIC 9 VALUE 1", "1 B PIC 9 VALUE 7."],
+        "a group header": ["01 G", "01 B PIC 9 VALUE 7."],
+    }
+
+    def test_an_entry_without_its_period_ends_at_the_next_01_or_77(self) -> None:
+        for label, storage in self.UNTERMINATED.items():
+            with self.subTest(label):
+                found = items_of(program(storage))
+                self.assertIn(("B", 77 if storage[-1].startswith("77") else 1, "9"), found)
+                if COBC and label != "a group header":  # GnuCOBOL wants a PICTURE for an empty 01 G
+                    self.assertTrue(gnucobol_accepts(program(storage)), label)
+
+    def test_the_entry_before_keeps_its_own_clauses(self) -> None:
+        found = items_of(program(self.UNTERMINATED["a VALUE literal"]))
+        self.assertEqual(found, [("G", 1, None), ("A", 5, "9"), ("B", 1, "9")])
+
+    def test_numbers_inside_clauses_never_start_an_entry(self) -> None:
+        storage = [
+            "01 N PIC 9 VALUE 1.",
+            "01 G.",
+            "    05 A PIC 9 OCCURS 1 TO 5 TIMES DEPENDING ON N.",
+            "    05 C PIC 99 VALUE IS 1.",
+            "      88 C-SET VALUES 1 THRU 77.",
+            "    05 D PIC 9 OCCURS 1 TIMES.",
+        ]
+        self.assertEqual(
+            items_of(program(storage)), [("N", 1, "9"), ("G", 1, None), ("A", 5, "9"), ("C", 5, "99"), ("D", 5, "9")]
+        )
+
+    def test_file_descriptions_are_not_items(self) -> None:
+        files = [
+            "FD IN-FILE",
+            "    RECORDING MODE IS V",
+            "    BLOCK CONTAINS 1 RECORDS",
+            "    RECORD IS VARYING IN SIZE FROM 10 TO 80 DEPENDING ON WS-LEN.",
+            "01 IN-REC PIC X(80).",
+        ]
+        lines = program(["01 WS-LEN PIC 9(4) COMP."], files)
+        self.assertEqual(items_of(lines), [("IN-REC", 1, "X(80)"), ("WS-LEN", 1, "9(4)")])
+        if COBC:
+            self.assertTrue(gnucobol_accepts(lines))
 
 
 if __name__ == "__main__":

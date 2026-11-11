@@ -222,11 +222,40 @@ def _level_of(token: Token) -> int | None:
     return None
 
 
+def _is_period(token: Token) -> bool:
+    return token.kind == "sep" and token.text == "."
+
+
+# Words that follow a number inside a clause: OCCURS 1 TIMES, OCCURS 1 TO 5, VALUES 1 THRU 9, CONTAINS 1 RECORDS.
+_AFTER_NUMBER = {"CHARACTERS", "LINES", "RECORDS", "THROUGH", "THRU", "TIMES", "TO"}
+
+
+def _unterminated_start(tokens: Sequence[Token], position: int) -> bool:
+    """A level 01 or 77 entry right after one left without its period (GnuCOBOL accepts that with a warning, and
+    only before 01 or 77): the level, a data name, then what only an entry has, so clause numbers never match."""
+    if _level_of(tokens[position]) not in (1, 77) or position + 2 >= len(tokens):
+        return False
+    name, after = tokens[position + 1], tokens[position + 2]
+    if name.kind != "word" or name.text in _CLAUSE_WORDS or name.text in _USAGE or name.text in _AFTER_NUMBER:
+        return False
+    return (
+        _is_period(after)
+        or after.kind == "pic"
+        or after.kind == "word"
+        and (after.text in _CLAUSE_WORDS or after.text in _USAGE)
+    )
+
+
 def _entry_end(tokens: Sequence[Token], start: int, end: int) -> int:
+    """The entry's period, or the start of the next entry when GnuCOBOL's optional period was left out."""
     position = start + 1
-    while position < end and not (tokens[position].kind == "sep" and tokens[position].text == "."):
+    while position < end and not _is_period(tokens[position]) and not _unterminated_start(tokens, position):
         position += 1
     return position
+
+
+def _after_entry(tokens: Sequence[Token], stop: int, end: int) -> int:
+    return stop + 1 if stop < end and _is_period(tokens[stop]) else stop
 
 
 _USAGE = {
@@ -325,6 +354,10 @@ def data_items(tokens: Sequence[Token]) -> DataItems:
     stack: list[Item] = []
     i = start
     while i < end:
+        if source[i].kind == "word" and source[i].text in ("FD", "SD"):
+            # File and sort descriptions are not items; their clauses hold numbers like FROM 10 TO 80.
+            i = _after_entry(source, _entry_end(source, i, end), end)
+            continue
         level = _level_of(source[i])
         if level is None:
             i += 1
@@ -332,7 +365,7 @@ def data_items(tokens: Sequence[Token]) -> DataItems:
 
         stop = _entry_end(source, i, end)
         entry = source[i:stop]
-        i = stop + 1 if stop < end else end
+        i = _after_entry(source, stop, end)
 
         if level in (66, 88):
             continue
