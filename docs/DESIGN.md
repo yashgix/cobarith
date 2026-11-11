@@ -125,6 +125,10 @@ Every solver answer is re-checked with `exact_results` before it is kept, so a c
 arithmetic, not z3's real approximation, really satisfies its kind. A kind that is unsatisfiable inside a box is
 retried with another centre, up to twelve attempts; if none succeed, that kind simply has no case for that target.
 
+Boundary cases are deterministic for one z3 version and `rlimit` (two runs here are byte-identical), but unlike
+the random cases they are not pinned across implementations: another z3 version, or another solver, may pick
+different witnesses, so boundary counts can shift while every random-case count stays the same.
+
 ## The harness
 
 `program(stmt)` re-emits the statement as generated GnuCOBOL.
