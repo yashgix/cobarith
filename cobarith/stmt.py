@@ -324,7 +324,7 @@ class _Parser:
         self.items = list(items)
         self.i = 0
         self.refs: list[_Ref] = []
-        self.by_key: dict[tuple[str, tuple[str, ...], str | None], int] = {}
+        self.by_key: dict[tuple[object, str | None], int] = {}
         self.read: list[bool] = []
         self.target_indices: list[int] = []
         self.target_names: list[str] = []
@@ -353,8 +353,7 @@ class _Parser:
     def resolve_variables(self) -> list[Variable]:
         variables: list[Variable] = []
         for ref in self.refs:
-            item = find_item(self.items, ref.base, ref.qualifiers)
-            ref.item = item
+            item = ref.item
             if item is None:
                 variables.append(Variable(ref.name, None, ""))
             else:
@@ -405,15 +404,17 @@ class _Parser:
         )
 
     def _record_ref(self, base: str, qualifiers: Sequence[str], subscript: str | None) -> _Ref:
+        """One variable per data item and subscript, however the reference is qualified (the spelling if unresolved)."""
         base_upper = base.upper()
         qualifiers_upper = tuple(qualifier.upper() for qualifier in qualifiers)
-        key = (base_upper, qualifiers_upper, subscript)
+        item = find_item(self.items, base_upper, qualifiers_upper)
+        key = (id(item) if item is not None else (base_upper, qualifiers_upper), subscript)
         if key in self.by_key:
             return self.refs[self.by_key[key]]
 
         index = len(self.refs)
         name = base_upper if subscript is None else f"{base_upper}({subscript})"
-        ref = _Ref(name, base_upper, qualifiers_upper, subscript, index)
+        ref = _Ref(name, base_upper, qualifiers_upper, subscript, index, item)
         self.refs.append(ref)
         self.by_key[key] = index
         self.read.append(False)
@@ -458,7 +459,11 @@ class _Parser:
                 raise _ParseError
             qualifiers.append(qualifier.text)
             self.i += 1
-            self._parse_subscript()
+            qualified = self._parse_subscript()
+            if qualified is not None:
+                if subscript is not None:
+                    raise _ParseError
+                subscript = qualified
 
         ref = self._record_ref(base, qualifiers, subscript)
         self.spans.append((start, self.i, ref.index))
