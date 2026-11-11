@@ -192,12 +192,7 @@ def _feature_reason(tokens: Sequence[Token]) -> str | None:
             text = token.text
             if text == "FUNCTION":
                 return "intrinsic function"
-            if (
-                text == "LENGTH"
-                and i + 1 < len(tokens)
-                and tokens[i + 1].kind == "word"
-                and tokens[i + 1].text == "OF"
-            ):
+            if text == "LENGTH" and i + 1 < len(tokens) and tokens[i + 1].kind == "word" and tokens[i + 1].text == "OF":
                 return "LENGTH OF"
             if text in _SPECIAL_REGISTERS:
                 return "special register"

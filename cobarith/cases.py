@@ -179,9 +179,7 @@ def _solve(
         return None
 
     model = solver.model()
-    case = tuple(
-        model.eval(z3_var, model_completion=True).as_long() for z3_var in z3_vars
-    )
+    case = tuple(model.eval(z3_var, model_completion=True).as_long() for z3_var in z3_vars)
     try:
         value = exact_results(stmt, case)[target_index]
     except ZeroDivisionError:

@@ -282,9 +282,7 @@ def _apply_replacement(text: str, source: Token, target: Token) -> str:
     return re.sub(pattern, lambda _m: replacement, text, flags=re.IGNORECASE)
 
 
-def _expand_tokens(
-    tokens: list[Token], library: Library, including: Path, depth: int
-) -> list[Token]:
+def _expand_tokens(tokens: list[Token], library: Library, including: Path, depth: int) -> list[Token]:
     if depth >= 10:
         return tokens
 
@@ -304,9 +302,7 @@ def _expand_tokens(
             pairs: list[tuple[Token, Token]] = []
             if j < len(tokens) and tokens[j].kind == "word" and tokens[j].text == "REPLACING":
                 j += 1
-                while j < len(tokens) and not (
-                    tokens[j].kind == "sep" and tokens[j].text == "."
-                ):
+                while j < len(tokens) and not (tokens[j].kind == "sep" and tokens[j].text == "."):
                     if j + 2 >= len(tokens):
                         break
                     source, by, target = tokens[j], tokens[j + 1], tokens[j + 2]
@@ -340,9 +336,7 @@ def _expand_tokens(
         ):
             name = _copy_name(tokens[i + 3])
             k = i + 4
-            while k < len(tokens) and not (
-                tokens[k].kind == "word" and tokens[k].text == "END-EXEC"
-            ):
+            while k < len(tokens) and not (tokens[k].kind == "word" and tokens[k].text == "END-EXEC"):
                 k += 1
             end = k + 1 if k < len(tokens) else k
 

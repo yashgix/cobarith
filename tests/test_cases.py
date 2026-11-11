@@ -72,9 +72,7 @@ class RandomCasesTest(unittest.TestCase):
             ["01 WS-A PIC S9(3).", "01 WS-B PIC S9(3).", "01 WS-C PIC S9(3)."],
             ["COMPUTE WS-C = WS-A / WS-B."],
         )[0]
-        divisor = next(
-            index for index, variable in enumerate(statement.variables) if variable.name == "WS-B"
-        )
+        divisor = next(index for index, variable in enumerate(statement.variables) if variable.name == "WS-B")
         cases = random_cases(statement, n=50)
         for case in cases:
             self.assertNotEqual(case[divisor], 0)
@@ -98,7 +96,7 @@ class BoundaryCasesTest(unittest.TestCase):
             self.assertIsNotNone(pic)
             assert pic is not None
             value = exact_results(statement, case)[target_index]
-            scaled = value * 10 ** pic.scale
+            scaled = value * 10**pic.scale
             if kind == "tie":
                 self.assertEqual(scaled.denominator, 2)
             elif kind == "exact":
@@ -125,9 +123,9 @@ class BoundaryCasesTest(unittest.TestCase):
             self.assertIsNotNone(pic)
             assert pic is not None
             value = exact_results(statement, case)[target_index]
-            scaled = value * 10 ** pic.scale
+            scaled = value * 10**pic.scale
             if kind == "over":
-                self.assertGreaterEqual(abs(value), Fraction(pic.capacity + 1, 10 ** pic.scale))
+                self.assertGreaterEqual(abs(value), Fraction(pic.capacity + 1, 10**pic.scale))
             elif kind == "negative":
                 self.assertLessEqual(scaled, -1)
             else:
