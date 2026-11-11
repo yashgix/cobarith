@@ -357,3 +357,26 @@ class ReceivingUsageTest(unittest.TestCase):
     def test_numeric_edited_targets_keep_their_sign(self) -> None:
         for picture in ("-ZZ9.99", "ZZ9.99CR", "ZZ9.99DB", "ZZ,ZZ9.99DB", "$$$9.99DB", "+999.99"):
             self.check(f"01 WS-T PIC {picture}.", "MULTIPLY WS-A BY WS-B GIVING WS-T.", [(-150, 300), (150, 300)])
+
+
+@unittest.skipUnless(COBC, "no GnuCOBOL compiler available")
+class CompilerDifferenceTest(unittest.TestCase):
+    """Where GnuCOBOL's intermediate arithmetic differs from the exact model (found by tools/sweep.py): the harness
+    must keep reporting what GnuCOBOL stores, and the model the exact value, so the difference stays measured."""
+
+    FIELDS = ["01 WS-B PIC S9(3)V9.", "01 WS-C PIC S9(5)V99."]
+
+    def check(self, text: str, gnucobol: int, exact: int) -> None:
+        statement = parse_program(self.FIELDS, [text])[0]
+        case = tuple({"WS-B": 45, "WS-C": 700}[v.name] for v in statement.variables)
+        self.assertEqual(run(statement, [case]), [((gnucobol,), False)])
+        self.assertEqual(translate(statement, case)["cobol_exact"], [exact])
+
+    def test_an_integer_literal_in_an_add_to_list_drops_the_sum_s_decimals(self) -> None:
+        self.check("ADD 3 WS-B TO WS-C.", 1400, 1450)  # 7 + 3 + 4.5; ADD 3.0 WS-B TO WS-C gives 14.50
+
+    def test_a_unary_minus_after_an_operator_truncates(self) -> None:
+        self.check("COMPUTE WS-C = 2 * -WS-B.", -800, -900)  # - WS-B * 2 gives -9.00
+
+    def test_a_division_keeps_limited_intermediate_decimals(self) -> None:
+        self.check("COMPUTE WS-C = WS-B / 7 * 7.", 449, 450)

@@ -233,6 +233,24 @@ report-writer (`RD`) entries; and any other COBOL statement or data-division fea
 rejects is not modelled. A milestone that wanted more of COBOL would widen the specification first, not the parser
 alone.
 
+## Checked against GnuCOBOL, statement by statement
+
+`tools/sweep.py` runs every probe in `tools/probes.py` three ways: GnuCOBOL on the source as written, the model,
+and the harness. The probes vary one thing at a time: each operand position of the eleven forms (field, qualified,
+subscripted, `IN`, variable subscript, integer, decimal, signed and `ZERO` literals), expressions with nested signs
+and parentheses, `ROUNDED` and size-error phrases, source layout (statements across lines, continued words and
+numbers, comment and debug lines, lower case, Area A, text past column 72) and data declarations. Where the model and
+GnuCOBOL disagree, the harness always matched GnuCOBOL, and the difference is GnuCOBOL's intermediate arithmetic,
+which the specification says to report, not to model away:
+
+- an integer literal in an `ADD ... TO` or `SUBTRACT ... FROM` operand list drops the decimals of the operands' sum
+  (`ADD 3 WS-B TO WS-C` adds 7, not 7.5, when WS-B is 4.5; `ADD 3.0 WS-B` and the `GIVING` forms are exact);
+- a unary minus right after an operator truncates its operand (`2 * -WS-B`, while `- WS-B * 2` is exact);
+- a division keeps a limited number of intermediate decimals (`WS-B / 7 * 7`).
+
+CardDemo has none of these, which is why its `cobol_exact` agreement is complete. `CompilerDifferenceTest` keeps
+one example of each.
+
 ## Open questions
 
 - Does IBM Enterprise COBOL with `TRUNC(BIN)` agree with GnuCOBOL `-std=ibm` on `COMP` overflow, and does the default
