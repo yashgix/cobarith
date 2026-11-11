@@ -64,7 +64,10 @@ floating `+`, `-` or `$` beyond the first of its kind, which reproduces the comp
 `binary_bits` follows the 2-4-8 byte widths `-std=ibm` uses: 16 bits up to 4 digits, 32 up to 9, 64 above.
 
 Data items come from level numbers 01-49 and 77. Levels 66 (`RENAMES`) and 88 (condition names) are skipped, and so
-are `FD`/`SD` entries, because the harness supplies its own files. Usage inherits: a group declared `COMP` makes its
+are `FD`/`SD` entries, because the harness supplies its own files. An entry ends at its period or, when the period is
+missing, where the next level number starts in Area A (columns 8-11): that is exactly where GnuCOBOL accepts the
+omission, with a warning. A number in Area B belongs to the clause before it (`OCCURS 1 TO 5`, `VALUES 1 THRU 77`),
+and an `FD` or `SD` entry is skipped to its period, so `RECORD ... FROM 10 TO 80` never becomes an item. Usage inherits: a group declared `COMP` makes its
 children binary unless they say otherwise. `INDEXED BY` names become items with `INDEX` usage, so a statement using
 one is rejected with `index item` instead of `unresolved name`.
 
@@ -78,7 +81,11 @@ each arithmetic verb. A statement ends before a period, an `END-*` scope termina
 phrase (which is recorded on the statement), or the next verb or statement word.
 
 Parsing is a small recursive-descent parser over the eleven forms in the specification, producing `Assignment`
-objects of exact expressions: `Literal`, `Field`, `Unary`, `Binary`. Variables are de-duplicated by name, qualifiers
+objects of exact expressions: `Literal`, `Field`, `Unary`, `Binary`. A numeric literal or `ZERO` is an operand in
+every position, including the one right before `GIVING` (`SUBTRACT 1 FROM ZERO GIVING T`); without `GIVING` that
+position receives the result, so it must be a field. A sign touching a number is that literal's sign, as COBOL reads
+it: in a list it starts a new value (`ADD A -1 TO B` adds A and -1), and where an operator is expected it is a syntax
+error (`COMPUTE T = A -1`, which GnuCOBOL also rejects). Variables are de-duplicated by name, qualifiers
 and subscript text, so `WS-A(1)` and `WS-A(2)` are different variables while `WS-A` twice is one.
 
 Reasons are checked in two passes, which fixes priority without tangled conditions: first the token-level features
@@ -113,7 +120,8 @@ Random cases are pinned to `sha256` of the statement id plus `|random`, so a rer
 same numbers on any machine. Odd cases may use the full picture range; even cases are capped at
 `min(capacity, 10**(scale + min(digits, 5)) - 1)`, which keeps most draws at a realistic magnitude while still
 letting wide ones appear. A case that would divide by zero is redrawn with the same parity, so the pattern of wide
-and narrow cases is not disturbed.
+and narrow cases is not disturbed. A divisor that is zero in every draw (`DIVIDE ZERO INTO A GIVING T`) stops after
+1,000 redraws in a row, with the cases found so far; GnuCOBOL raises a size error there, and no case can show it.
 
 Boundary cases are the interesting half, and they are solved rather than sampled. For each flagged kind and each
 receiving field, z3 is asked for an integer assignment to the variables, within their picture ranges (and, after the
@@ -135,14 +143,16 @@ different witnesses, so boundary counts can shift while every random-case count 
 
 - Every variable becomes a level-01 field declaring the statement's own picture text and usage.
 - The statement runs as written: its own tokens, one space apart, with each data reference (qualifiers and
-  subscripts included) renamed to its field, so GnuCOBOL applies the verb's own rules. Only a unary sign that touched
-  its number stays glued (`ADD +1`), because COBOL reads that as one literal; everything else may wrap, and a word
-  that can't fit in columns 8-72 is refused rather than written past column 72. No `EXEC` blocks, file sections or
+  subscripts included) renamed to its field, so GnuCOBOL applies the verb's own rules. A sign that touched its
+  number stays glued (`ADD A -1 TO B`), because COBOL reads that as one literal; other touching tokens (`A+B`) mean
+  the same with spaces, so they may wrap, and a word that can't fit in columns 8-72 is refused rather than written
+  past column 72. No `EXEC` blocks, file sections or
   CICS are needed.
 - Input cases come from `cases.txt`, each variable as sign-leading-separate signed digits, moved into the field
   before the statement runs.
 - Each receiving field is displayed afterwards through a signed display field wide enough for a binary field's whole
-  range, followed by the size-error flag.
+  range, followed by the size-error flag. GnuCOBOL's de-editing `MOVE` drops a `DB` sign (it keeps `CR`, `+` and
+  `-`), so for a `DB` picture the harness checks the field's last two characters and restores the sign.
 
 Long lines are split at word boundaries inside the code area (65 columns of code starting at column 8) so the
 generated program stays valid fixed format. Names are sanitised to legal COBOL data names and de-duplicated.
@@ -207,6 +217,21 @@ number, which is why the README can be regenerated safely after every experiment
   integer variables keep the search small. A few statements will simply not produce every kind of boundary case.
 - **GnuCOBOL only.** It is the compiler available here. IBM Enterprise COBOL's `TRUNC` option changes the `COMP`
   story, and the README says so instead of guessing.
+
+## What the parser covers, and what it doesn't
+
+Covered: the eleven arithmetic forms of the specification with identifiers (qualified, subscripted), numeric
+literals and `ZERO` in every operand position; `ROUNDED`; `ON SIZE ERROR`; receiving fields in `DISPLAY`, `COMP`,
+`COMP-3`, `COMP-5` and numeric-edited usage, each checked against GnuCOBOL; data entries with or without the
+optional period; `COPY` and `EXEC SQL INCLUDE` members. Every rule above was probed against GnuCOBOL 3.2 with
+`-std=ibm`, and the tests keep those probes.
+
+Not covered, by the specification's scope: the reasons it lists (intrinsic functions, `LENGTH OF`, special
+registers, `REMAINDER`, `CORRESPONDING`, exponentiation, reference modification, nonnumeric literals, `ROUNDED MODE`,
+floating-point and `P`-scaled operands, edited operands); figurative constants other than `ZERO`; free-format source;
+report-writer (`RD`) entries; and any other COBOL statement or data-division feature. Source that GnuCOBOL itself
+rejects is not modelled. A milestone that wanted more of COBOL would widen the specification first, not the parser
+alone.
 
 ## Open questions
 
