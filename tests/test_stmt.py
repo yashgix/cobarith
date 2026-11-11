@@ -157,6 +157,49 @@ class StatementFormsTest(unittest.TestCase):
             self.assertTrue(statements[0].id.startswith("PROG:SNIP.cpy:"))
 
 
+class VariableIdentityTest(unittest.TestCase):
+    """A variable is one data item with one subscript, however the reference is spelled."""
+
+    GROUPS = [
+        "01 G.",
+        "   05 X PIC S9(3).",
+        "   05 T OCCURS 3 TIMES PIC S9(3).",
+        "01 H.",
+        "   05 Y PIC S9(3).",
+        "   05 Z PIC S9(3).",
+        "01 K.",
+        "   05 Y PIC S9(5)V9.",
+        "01 W PIC S9(5).",
+    ]
+
+    def variables(self, statement: str) -> list[tuple[str, str]]:
+        parsed = parse_program(self.GROUPS, [statement])[0]
+        self.assertEqual(parsed.status, "harnessed", parsed.reason)
+        return [(v.name, v.pic.text) for v in parsed.variables]
+
+    def test_qualified_and_plain_references_to_one_item_are_one_variable(self) -> None:
+        self.assertEqual(self.variables("ADD X OF G TO X."), [("X", "S9(3)")])
+        self.assertEqual(self.variables("COMPUTE W = X + X IN G."), [("W", "S9(5)"), ("X", "S9(3)")])
+
+    def test_a_subscript_after_the_qualifier_belongs_to_the_reference(self) -> None:
+        self.assertEqual(
+            self.variables("COMPUTE W = T OF G(1) + T OF G(2)."),
+            [("W", "S9(5)"), ("T(1)", "S9(3)"), ("T(2)", "S9(3)")],
+        )
+
+    def test_the_same_subscript_written_either_way_is_one_variable(self) -> None:
+        self.assertEqual(self.variables("COMPUTE W = T(2) + T OF G(2)."), [("W", "S9(5)"), ("T(2)", "S9(3)")])
+
+    def test_items_with_the_same_name_in_different_groups_stay_distinct(self) -> None:
+        self.assertEqual(
+            self.variables("COMPUTE W = Y OF H + Y OF K."), [("W", "S9(5)"), ("Y", "S9(3)"), ("Y", "S9(5)V9")]
+        )
+
+    def test_an_ambiguous_unqualified_name_is_still_unresolved(self) -> None:
+        parsed = parse_program(self.GROUPS, ["COMPUTE W = Y + Z."])[0]
+        self.assertEqual((parsed.status, parsed.reason), ("unsupported", "unresolved name"))
+
+
 class FlagsTest(unittest.TestCase):
     def test_add_flags_size_and_sign(self) -> None:
         statements = parse_program(NUMERIC_FIELDS, ["ADD WS-A TO WS-B."])
