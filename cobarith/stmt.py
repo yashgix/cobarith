@@ -89,6 +89,25 @@ class Statement:
     spans: list[tuple[int, int, int]] = field(default_factory=list, repr=False)
 
 
+REASONS = (
+    "intrinsic function",
+    "LENGTH OF",
+    "special register",
+    "unresolved name",
+    "non-numeric field",
+    "index item",
+    "floating-point usage",
+    "P scaling",
+    "numeric-edited operand",
+    "REMAINDER",
+    "reference modification",
+    "nonnumeric literal",
+    "CORRESPONDING",
+    "exponentiation",
+    "ROUNDED MODE",
+    "syntax",
+)
+
 _VERBS = {"ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE"}
 
 _TERMINATORS = {

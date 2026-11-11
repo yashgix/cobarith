@@ -12,7 +12,7 @@ from cobarith import DATA_DIR
 from cobarith.cases import boundary_cases, random_cases
 from cobarith.harness import run
 from cobarith.inventory import Inventory, inventory
-from cobarith.stmt import Statement
+from cobarith.stmt import REASONS, Statement
 from cobarith.translate import TRANSLATIONS, translate
 
 COMPARED = tuple(name for name in TRANSLATIONS if name != "cobol_exact")
@@ -125,6 +125,8 @@ def _metrics(inv: Inventory, records: Sequence[dict]) -> dict:
         metrics[f"statements_{verb.lower()}"] = 0
     for flag in FLAGS:
         metrics[f"statements_flag_{flag}"] = 0
+    for reason in REASONS:
+        metrics[f"unsupported_{_slug(reason)}"] = 0
     for name in COMPARED:
         metrics[f"{name}_statements_differ"] = 0
         metrics[f"{name}_statements_differ_arithmetic"] = 0
