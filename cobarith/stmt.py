@@ -85,6 +85,8 @@ class Statement:
     assignments: list[Assignment] = field(default_factory=list, repr=False)
     target_indices: list[int] = field(default_factory=list, repr=False)
     read_flags: list[bool] = field(default_factory=list, repr=False)
+    tokens: list[Token] = field(default_factory=list, repr=False)
+    spans: list[tuple[int, int, int]] = field(default_factory=list, repr=False)
 
 
 _VERBS = {"ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE"}
@@ -313,6 +315,7 @@ class _Parser:
         self.target_indices: list[int] = []
         self.target_names: list[str] = []
         self.assignments: list[Assignment] = []
+        self.spans: list[tuple[int, int, int]] = []
 
     def parse(self) -> None:
         if not self.tokens or self.tokens[0].kind != "word":
@@ -429,6 +432,7 @@ class _Parser:
         if token is None or token.kind != "word" or token.text in _RESERVED:
             raise _ParseError
         base = token.text
+        start = self.i
         self.i += 1
         subscript = self._parse_subscript()
         qualifiers: list[str] = []
@@ -442,7 +446,9 @@ class _Parser:
             self.i += 1
             self._parse_subscript()
 
-        return self._record_ref(base, qualifiers, subscript)
+        ref = self._record_ref(base, qualifiers, subscript)
+        self.spans.append((start, self.i, ref.index))
+        return ref
 
     def _parse_number(self) -> Literal:
         sign = 1
@@ -950,6 +956,8 @@ def _build_statement(
         list(parser.assignments),
         list(parser.target_indices),
         list(parser.read),
+        token_list,
+        sorted(set(parser.spans)),
     )
 
 

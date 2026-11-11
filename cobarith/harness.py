@@ -15,7 +15,7 @@ from fractions import Fraction
 from pathlib import Path
 
 from .data import Pic, binary_bits
-from .stmt import Binary, Expr, Field, Literal, Statement, Unary, Variable
+from .stmt import Statement, Variable
 
 __all__ = ["program", "run"]
 
@@ -108,45 +108,30 @@ def _declaration(variable: Variable) -> str:
     return text
 
 
-def _literal_text(literal: Literal) -> str:
-    value = literal.value
-    scale = literal.scale
-    digits = f"{int(abs(value) * 10**scale):0{scale + 1}d}"
-    sign = "-" if value < 0 else ""
-    if scale:
-        return f"{sign}{digits[:-scale]}.{digits[-scale:]}"
-    return f"{sign}{digits}"
-
-
-def _expression(expr: Expr, fields: Sequence[str]) -> str:
-    if isinstance(expr, Literal):
-        return _literal_text(expr)
-    if isinstance(expr, Field):
-        return fields[expr.index]
-    if isinstance(expr, Unary):
-        if expr.op == "+":
-            return _expression(expr.operand, fields)
-        if isinstance(expr.operand, Literal):
-            return _literal_text(Literal(-expr.operand.value, expr.operand.scale))
-        inner = _expression(expr.operand, fields)
-        if isinstance(expr.operand, (Binary, Unary)) or inner.startswith("-"):
-            inner = f"( {inner} )"
-        return f"-{inner}"
-    if isinstance(expr, Binary):
-        left = _expression(expr.left, fields)
-        right = _expression(expr.right, fields)
-        return f"( {left} {expr.op} {right} )"
-    raise TypeError(f"unsupported expression: {expr!r}")
-
-
-def _assignment(assignment, size_error: bool, fields: Sequence[str]) -> str:
-    text = f"COMPUTE {fields[assignment.target]}"
-    if assignment.rounded:
-        text += " ROUNDED"
-    text += f" = {_expression(assignment.expr, fields)}"
-    if size_error:
-        text += f" ON SIZE ERROR MOVE 1 TO {_FLAG}"
-    return f"{text} END-COMPUTE"
+def _statement_text(stmt: Statement, fields: Sequence[str]) -> str:
+    """The statement's own tokens with each data reference renamed; tokens that touched in the source still touch."""
+    spans = {start: (end, index) for start, end, index in stmt.spans}
+    words: list[str] = []
+    previous = None
+    k = 0
+    while k < len(stmt.tokens):
+        first = stmt.tokens[k]
+        if k in spans:
+            end, index = spans[k]
+            text, last = fields[index], stmt.tokens[end - 1]
+            k = end
+        else:
+            text, last = first.text, first
+            k += 1
+        glued = previous is not None and (previous.file, previous.line, previous.end) == (first.file, first.line, first.col)
+        if glued:
+            words[-1] += text
+        else:
+            words.append(text)
+        previous = last
+    if stmt.size_error:
+        words += ["ON", "SIZE", "ERROR", "MOVE", "1", "TO", _FLAG, f"END-{stmt.verb}"]
+    return " ".join(words)
 
 
 def program(stmt: Statement) -> str:
@@ -197,8 +182,7 @@ def program(stmt: Statement) -> str:
     for name, source in zip(fields, sources, strict=True):
         add(f"MOVE {source} TO {name}", _STATEMENT)
     add(f"MOVE 0 TO {_FLAG}", _STATEMENT)
-    for assignment in stmt.assignments:
-        add(_assignment(assignment, stmt.size_error, fields), _STATEMENT)
+    add(_statement_text(stmt, fields), _STATEMENT)
     for assignment, display in zip(stmt.assignments, displays, strict=True):
         add(f"MOVE {fields[assignment.target]} TO {display}", _STATEMENT)
     for display in displays:
