@@ -12,7 +12,7 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from .data import Pic, binary_bits
+from .data import Pic, _expand_repeats, binary_bits
 from .stmt import Statement, Variable
 
 __all__ = ["program", "run"]
@@ -99,6 +99,15 @@ def _output_picture(variable: Variable) -> str:
         bound = pic.capacity
     digits = max(pic.digits, len(str(bound)) - pic.scale, 1)
     return _scaled_picture(digits, pic.scale)
+
+
+def _debit_position(variable: Variable) -> int | None:
+    """Where a DB sign sits in a numeric-edited field (1-based), or None when its picture has none."""
+    pic = _picture_of(variable)
+    if pic.kind != "edited" or not pic.text.upper().endswith("DB"):
+        return None
+    symbols = _expand_repeats(pic.text.upper())
+    return len(symbols) - symbols.count("V") - symbols.count("P") - 1
 
 
 def _declaration(variable: Variable) -> str:
@@ -194,7 +203,11 @@ def program(stmt: Statement) -> str:
     add(f"MOVE 0 TO {_FLAG}", _STATEMENT)
     add(_statement_text(stmt, fields), _STATEMENT)
     for assignment, display in zip(stmt.assignments, displays, strict=True):
-        add(f"MOVE {fields[assignment.target]} TO {display}", _STATEMENT)
+        field = fields[assignment.target]
+        add(f"MOVE {field} TO {display}", _STATEMENT)
+        if (debit := _debit_position(variables[assignment.target])) is not None:
+            # GnuCOBOL's de-editing MOVE drops a DB sign (CR, + and - survive), so restore it from the field's text.
+            add(f"IF {field}({debit}:2) = 'DB' COMPUTE {display} = 0 - {display} END-IF", _STATEMENT)
     for display in displays:
         add(f"DISPLAY {display}", _STATEMENT)
     add(f"DISPLAY {_FLAG}", _STATEMENT)

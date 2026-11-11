@@ -333,3 +333,27 @@ class LiteralOperandTest(unittest.TestCase):
             with self.subTest(text):
                 self.assertEqual(parse_program(self.FIELDS, [text])[0].reason, "syntax")
                 self.assertFalse(compiles(self.FIELDS, [text]))
+
+
+@unittest.skipUnless(COBC, "no GnuCOBOL compiler available")
+class ReceivingUsageTest(unittest.TestCase):
+    """Packed, native binary and numeric-edited receiving fields: the model's stored units equal GnuCOBOL's."""
+
+    def check(self, target: str, text: str, values: list[tuple[int, int]]) -> None:
+        statement = parse_program(["01 WS-A PIC S9(3)V99.", "01 WS-B PIC S9(3)V99.", target], [text])[0]
+        for a, b in values:
+            with self.subTest(target=target, a=a, b=b):
+                case = tuple({"WS-A": a, "WS-B": b}.get(v.name, 0) for v in statement.variables)
+                agrees_with_gnucobol(self, statement, case)
+
+    def test_comp_3_truncates_and_rounds_like_display(self) -> None:
+        self.check("01 WS-T PIC S9(3)V99 COMP-3.", "COMPUTE WS-T = WS-A * WS-B.", [(12345, 1000), (99999, 99999)])
+        self.check("01 WS-T PIC S9(3)V99 COMP-3.", "COMPUTE WS-T ROUNDED = WS-A / 3.", [(100, 0), (-100, 0)])
+
+    def test_comp_5_keeps_its_whole_binary_range(self) -> None:
+        self.check("01 WS-T PIC S9(4) COMP-5.", "MULTIPLY WS-A BY WS-B GIVING WS-T.", [(20000, 20000), (-20000, 20000)])
+        self.check("01 WS-T PIC 9(4) COMP-5.", "ADD WS-A WS-B GIVING WS-T.", [(99999, 99999), (5000, 5000)])
+
+    def test_numeric_edited_targets_keep_their_sign(self) -> None:
+        for picture in ("-ZZ9.99", "ZZ9.99CR", "ZZ9.99DB", "ZZ,ZZ9.99DB", "$$$9.99DB", "+999.99"):
+            self.check(f"01 WS-T PIC {picture}.", "MULTIPLY WS-A BY WS-B GIVING WS-T.", [(-150, 300), (150, 300)])
