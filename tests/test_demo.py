@@ -161,3 +161,19 @@ class SummaryTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SameNameScalesTest(unittest.TestCase):
+    """Two items may share a display name; each value is shown at its own picture's scale."""
+
+    def test_targets_use_their_own_variable_scale(self) -> None:
+        record = {
+            "variables": [["Y", "S9(3)", "DISPLAY"], ["Y", "S9(5)V9", "DISPLAY"]],
+            "targets": ["Y"],
+            "target_variables": [1],
+            "float_round": _info(1, {"inputs": [5, 123], "cobol": [123], "translation": [124]}),
+        }
+        text = demo._example(record, ["float_round"])
+        self.assertIn("Y=5, Y=12.3", text)
+        self.assertIn("COBOL Y=12.3", text)
+        self.assertIn("float_round Y=12.4", text)
