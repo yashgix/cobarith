@@ -336,6 +336,38 @@ class LiteralOperandTest(unittest.TestCase):
 
 
 @unittest.skipUnless(COBC, "no GnuCOBOL compiler available")
+class Binary64Test(unittest.TestCase):
+    """10+ digit binary fields are 64 bits: outside that range a value wraps modulo 2**64 (binary-truncate: no), and
+    with ON SIZE ERROR keeps its prior value. Expected values are worked by hand, then GnuCOBOL and the model agree."""
+
+    N = 9_999_999_999  # N * N = 99,999,999,980,000,000,001; minus 5 * 2**64 = 7,766,279,611,452,241,921
+
+    def check(self, data, procedure, cases, expected):
+        statement = parse_program(data, [procedure])[0]
+        self.assertEqual(run(statement, cases), expected)
+        for case, (stored, _) in zip(cases, expected, strict=True):
+            self.assertEqual(tuple(translate(statement, case)["cobol_exact"]), stored)
+
+    def test_a_signed_comp_product_wraps_at_64_bits(self) -> None:
+        data = ["01 WS-A PIC S9(10) COMP.", "01 WS-B PIC S9(10).", "01 WS-C PIC S9(10)."]
+        cases = [(0, self.N, self.N), (0, -self.N, self.N), (0, 3_037_000_500, 3_037_000_500)]
+        # 3,037,000,500 ** 2 = 9,223,372,037,000,250,000, just past 2**63 - 1: it wraps to the negative side.
+        expected = [((7_766_279_611_452_241_921,), False), ((-7_766_279_611_452_241_921,), False),
+                    ((-9_223_372_036_709_301_616,), False)]  # fmt: skip
+        self.check(data, "COMPUTE WS-A = WS-B * WS-C.", cases, expected)
+
+    def test_an_unsigned_comp_wraps_modulo_2_to_the_64(self) -> None:
+        data = ["01 WS-A PIC 9(18) COMP.", "01 WS-B PIC 9(10).", "01 WS-C PIC 9(10)."]
+        cases = [(0, self.N, self.N), (0, 2**32, 2**32)]
+        self.check(data, "COMPUTE WS-A = WS-B * WS-C.", cases, [((7_766_279_611_452_241_921,), False), ((0,), False)])
+
+    def test_size_error_keeps_the_prior_64_bit_value(self) -> None:
+        data = ["01 WS-A PIC S9(10) COMP.", "01 WS-B PIC S9(10).", "01 WS-C PIC S9(10)."]
+        procedure = "COMPUTE WS-A = WS-B * WS-C ON SIZE ERROR CONTINUE END-COMPUTE."
+        self.check(data, procedure, [(123, self.N, self.N), (5, 2, 3)], [((123,), True), ((6,), False)])
+
+
+@unittest.skipUnless(COBC, "no GnuCOBOL compiler available")
 class ReceivingUsageTest(unittest.TestCase):
     """Packed, native binary and numeric-edited receiving fields: the model's stored units equal GnuCOBOL's."""
 
