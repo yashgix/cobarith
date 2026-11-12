@@ -41,6 +41,7 @@ def _record(statement_id: str, translation: str, example: dict[str, Any] | None 
     }
     for name in demo.COMPARED:
         record[name] = _info(1 if name == translation else 0, example if name == translation else None)
+    record["arithmetic_examples"] = {name: example if name == translation else None for name in demo.COMPARED}
     return record
 
 
@@ -95,6 +96,16 @@ class RenderTest(unittest.TestCase):
         self.assertIn("WS-B=1.23", text)
         self.assertIn("1.24", text)
         self.assertIn("COBOL exact agreement: 1.000000", text)
+
+    def test_the_table_shows_an_arithmetic_example_not_an_earlier_overflow(self) -> None:
+        overflow = {"inputs": [0, 99999], "cobol": [99], "translation": [99999]}
+        arithmetic = {"inputs": [0, 125], "cobol": [125], "translation": [126]}
+        record = _record("TEST:1:COMPUTE", "float_round", arithmetic)
+        record["float_round"]["example"] = overflow  # the first difference of any kind, as the spec defines it
+        text = demo.render(_metrics(), [record])
+
+        self.assertIn("float_round WS-B=1.26", text)
+        self.assertNotIn("999.99", text)
 
     def test_replace_results_block_preserves_surrounding_text(self) -> None:
         template = "Before\n\n<!-- results:start -->\nold\n<!-- results:end -->\n\nAfter\n"
@@ -172,6 +183,7 @@ class SameNameScalesTest(unittest.TestCase):
             "targets": ["Y"],
             "target_variables": [1],
             "float_round": _info(1, {"inputs": [5, 123], "cobol": [123], "translation": [124]}),
+            "arithmetic_examples": {"float_round": {"inputs": [5, 123], "cobol": [123], "translation": [124]}},
         }
         text = demo._example(record, ["float_round"])
         self.assertIn("Y=5, Y=12.3", text)

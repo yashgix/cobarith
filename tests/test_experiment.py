@@ -65,6 +65,24 @@ class ExperimentTest(unittest.TestCase):
             self.assertEqual(metrics["statements_compute"], 1)
             self.assertEqual(metrics["unsupported_intrinsic_function"], 1)
 
+    def test_the_arithmetic_example_skips_an_earlier_storage_overflow(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(tmp, ["01 WS-A PIC 9V9.", "01 WS-B PIC 9(2)."], ["COMPUTE WS-A = WS-B / 3."])
+            # B = 60: 20.0 overflows 9V9 (a storage effect); B = 2: 0.666... truncates to 0.6, float_round gives 0.7.
+            with (
+                mock.patch("experiment.random_cases", return_value=[(0, 60), (0, 2)]),
+                mock.patch("experiment.boundary_cases", return_value=[]),
+                mock.patch("experiment.run", return_value=[((0,), False), ((6,), False)]),
+            ):
+                _, records = experiment.experiment(root)
+
+        record = records[0]
+        self.assertEqual(record["float_round"]["cases_differ_storage"], 1)
+        self.assertEqual(record["float_round"]["cases_differ_arithmetic"], 1)
+        self.assertEqual(record["float_round"]["example"]["inputs"], [0, 60])
+        expected = {"inputs": [0, 2], "cobol": [6], "translation": [7]}
+        self.assertEqual(record["arithmetic_examples"]["float_round"], expected)
+
     def test_harnessed_record_and_example(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = make_root(

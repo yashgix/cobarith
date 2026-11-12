@@ -195,8 +195,9 @@ keeping those buckets apart is what stops the report from blaming floating point
 ## Experiment output
 
 `metrics.json` is numbers only with sorted keys, and `statements.jsonl` carries one record per statement with the
-first differing case per translation (inputs, COBOL's stored units, the translation's units). Both are written with
-Unix newlines and deterministic ordering, so two runs are byte-identical; the runner checks that. A `cobol_exact`
+first differing case per translation (`example`: inputs, COBOL's stored units, the translation's units) and, in
+`arithmetic_examples`, the first one that is not a storage effect. The README's arithmetic table shows the latter, so
+its example always illustrates an arithmetic difference, never an overflow. Both are written with Unix newlines and deterministic ordering, so two runs are byte-identical; the runner checks that. A `cobol_exact`
 difference is reported, never hidden and never removed by bending the rule to match.
 
 `demo.py` renders the README block from those two files only. It never recomputes anything and never contains a

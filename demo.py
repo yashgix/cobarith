@@ -77,11 +77,9 @@ def _example(record: Mapping[str, Any], names: Sequence[str]) -> str:
     if positions is None:  # records written before target_variables existed: the first variable with that name
         positions = [variables.index(name) if name in variables else -1 for name in targets]
     target_scales = [scales[i] if 0 <= i < len(scales) else 0 for i in positions]
+    examples = record.get("arithmetic_examples") or {}
     for name in names:
-        info = record.get(name)
-        if not isinstance(info, Mapping):
-            continue
-        example = info.get("example")
+        example = examples.get(name)  # an arithmetic difference, never a storage overflow
         if not isinstance(example, Mapping):
             continue
         inputs = example.get("inputs") or []

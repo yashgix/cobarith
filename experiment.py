@@ -63,6 +63,7 @@ def _statement_record(stmt: Statement) -> dict:
         }
         for name in COMPARED
     }
+    arithmetic_examples = dict.fromkeys(COMPARED)  # the first difference that is not a storage effect
     exact_differ = 0
 
     for index, case in enumerate(cases):
@@ -80,16 +81,15 @@ def _statement_record(stmt: Statement) -> dict:
                 info["cases_differ_random"] += 1
             else:
                 info["cases_differ_boundary"] += 1
+            example = {"inputs": list(case), "cobol": list(cobol), "translation": list(values)}
             if storage:
                 info["cases_differ_storage"] += 1
             else:
                 info["cases_differ_arithmetic"] += 1
+                if arithmetic_examples[name] is None:
+                    arithmetic_examples[name] = example
             if info["example"] is None:
-                info["example"] = {
-                    "inputs": list(case),
-                    "cobol": list(cobol),
-                    "translation": list(values),
-                }
+                info["example"] = example
 
     record.update(
         {
@@ -103,6 +103,7 @@ def _statement_record(stmt: Statement) -> dict:
             "cases_random": len(random),
             "cases_boundary": len(boundary),
             "cobol_exact_cases_differ": exact_differ,
+            "arithmetic_examples": arithmetic_examples,
         }
     )
     record.update(per)
