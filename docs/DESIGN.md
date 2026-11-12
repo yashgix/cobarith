@@ -148,6 +148,13 @@ different witnesses, so boundary counts can shift while every random-case count 
   the same with spaces, so they may wrap, and a word that can't fit in columns 8-72 is refused rather than written
   past column 72. No `EXEC` blocks, file sections or
   CICS are needed.
+- This is narrower than the specification's wording ("tokens that touched in the source stay touching"): only the
+  sign-and-number case keeps touching, because it is the only one where adjacency changes the meaning. Tokens are
+  fixed before the harness is written, and a hyphen inside a word is part of the word (`WS-A-WS-B` is one name, an
+  unresolved one, for GnuCOBOL and the parser alike), so a space between two tokens cannot split or merge them.
+  Checked against GnuCOBOL on the source as written: all 118 harnessed sweep probes with touching tokens give the
+  same stored values through the spaced harness, as do nine further unspaced forms (parentheses, `*-1`, `+-`,
+  `ROUNDED=`, `ON SIZE ERROR`). Keeping every adjacency would leave long unspaced statements unable to wrap.
 - Input cases come from `cases.txt`, each variable as sign-leading-separate signed digits, moved into the field
   before the statement runs.
 - Each receiving field is displayed afterwards through a signed display field wide enough for a binary field's whole
