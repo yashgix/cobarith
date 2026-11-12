@@ -1,79 +1,89 @@
-# How to explain this project
+# Interview notes
 
-## The one-sentence version
+## The problem
 
-I took a real COBOL application, ran its arithmetic statements through the compiler and through four plausible
-Python translations, and counted the statements and inputs where the Python code stores a different value.
+I took a real COBOL application, ran its arithmetic statements through the compiler and through four plausible Python translations, and counted the statements and inputs where the Python code stores a different value.
 
-## Why it matters
+Every COBOL-to-Python migration has an arithmetic step that looks trivial and is not. COBOL stores exact fixed-point decimals, truncates toward zero, keeps the low-order digits when a result does not fit the receiving field, sends `ROUNDED` halves away from zero, and stores `COMP` values in binary fields whose width comes from the picture. A Python translation written with `float` and `round()`, or with `Decimal` and its default half-even rounding, or with no size handling at all, will silently store a different number on some inputs. Nothing crashes; the balance is just wrong by a cent, or by a lot more when a field overflows.
 
-Every COBOL-to-Python migration has an arithmetic step that looks trivial and is not. COBOL stores exact fixed-point
-decimals, truncates toward zero, keeps the low-order digits when a result does not fit the receiving field, sends
-`ROUNDED` halves away from zero, and stores `COMP` values in binary fields whose width comes from the picture. A
-Python translation written with `float` and `round()`, or with `Decimal` and its default half-even rounding, or with
-no size handling at all, will silently store a different number on some inputs. Nothing crashes; the balance is just
-wrong by a cent, or by a lot more when a field overflows.
+## Why this approach
 
-So the useful question for a migration is not whether the arithmetic is right in general, but which statements are
-exposed and on which inputs. That is what this measures.
+The useful question for a migration is not whether the arithmetic is right in general, but which statements are exposed and on which inputs. That is what this measures.
 
-## The method, in four moves
+The ground truth is the compiler's output, not my reading of the standard: each statement runs in GnuCOBOL as written. The interesting inputs are rare, so a solver is asked for them instead of waiting for sampling to hit them. And a difference is split into storage and arithmetic, which stops floating point from being blamed for a plain overflow.
 
-1. **Parse the real source.** Fixed-format columns, `COPY` expansion, `PICTURE` parsing, qualified names. Only the
-   five arithmetic verbs are kept, and each statement becomes exact expressions over its variables.
-2. **Run COBOL itself.** For each statement, generate a small GnuCOBOL program with the same pictures and usages,
-   feed it cases, and print the stored values back. The ground truth is the compiler's output, not my reading of the
-   standard.
-3. **Run four translations.** The same statement, in exact Python arithmetic: with the COBOL storage rule, with no
-   storage rule, in floats with `round`, in `Decimal` with half-even, and in floats truncated. Compare stored units.
-4. **Find the interesting inputs.** Pinned random cases over the picture ranges, plus z3-solved boundary cases: a
-   rounding tie, an exactly representable value, an overflow, a negative value into an unsigned field.
+## Architecture
 
-## What the numbers mean
+The method, in four moves.
+
+1. **Parse the real source.** Fixed-format columns, `COPY` expansion, `PICTURE` parsing, qualified names. Only the five arithmetic verbs are kept, and each statement becomes exact expressions over its variables.
+2. **Run COBOL itself.** For each statement, generate a small GnuCOBOL program with the same pictures and usages, feed it cases, and print the stored values back.
+3. **Run the translations.** The same statement in exact Python arithmetic with the COBOL storage rule (my model of the compiler, checked against it), and four translations: exact with no storage rule, floats with `round`, `Decimal` with half-even, and floats truncated. Compare stored units.
+4. **Find the interesting inputs.** Pinned random cases over the picture ranges, plus z3-solved boundary cases: a rounding tie, an exactly representable value, an overflow, a negative value into an unsigned field.
+
+## Data flow
+
+`tools/fetch_data.py` downloads the CardDemo COBOL sources at a fixed commit (Apache-2.0) and checks them against `upstream/MANIFEST.json`. `source.py` tokenizes fixed-format source and expands `COPY`; `data.py` parses each data item's `PICTURE`; `stmt.py` turns each arithmetic statement into variables, targets, assignments and flags, or a reason it is not supported. `cases.py` gives each supported statement pinned random cases and z3 boundary cases. `harness.py` generates one GnuCOBOL program per statement and runs it over the cases; `translate.py` computes the same statement five ways. `experiment.py` writes `results/metrics.json` and one record per statement in `results/statements.jsonl`, and `demo.py` renders the README's results block from them.
+
+## Trade-offs
+
+One statement at a time: no data flow, so a receiving field's prior value and the operands come from the case. Cheaper and reproducible, and enough to find the storage differences.
+
+Run the statement as written: the harness keeps the statement's own tokens and renames only its data references, so no re-rendering changes what is measured. The cost is that statements whose operands can't be harnessed (intrinsic functions, MQ fields from missing system copybooks) are listed, not run.
+
+Wide inputs: random cases span the picture ranges instead of resembling real transaction data, which maximises the chance of finding a difference; counts are exposure, not rates.
+
+z3 with a resource limit rather than a full bit-vector encoding: a few statements will not produce every kind of boundary case.
+
+GnuCOBOL only: it is the compiler available here.
+
+## Results
 
 - *Statements differ*: at least one case of that statement stored a different value under that translation.
 - *Cases differ*: how many cases did, split into random and boundary.
-- *Storage versus arithmetic*: a difference is counted as storage when the COBOL storage rule itself changed the
-  exact result (overflow, wrap, size error) and as arithmetic otherwise. Keeping them apart is the honest part: it
-  stops floating point from being blamed for a plain overflow.
-- *COBOL exact agreement*: how often my implementation of the storage rule agrees with the compiler on the same
-  cases. It should be 1.0; when it is not, the model is wrong and the differences are suspect.
+- *Storage versus arithmetic*: a difference is counted as storage when the COBOL storage rule itself changed the exact result (overflow, wrap, size error) and as arithmetic otherwise. Keeping them apart is the honest part: it stops floating point from being blamed for a plain overflow.
+- *COBOL exact agreement*: how often my implementation of the storage rule agrees with the compiler on the same cases. It should be 1.0; when it is not, the model is wrong and the differences are suspect.
 
-## What the numbers do not mean
+The numbers themselves are in the README's rendered table, generated by `demo.py`; I read them off it rather than quote them from memory.
+
+## Limitations
 
 - They are not rates in production data. Inputs span the whole picture range on purpose, to find the differences.
-- They say nothing about any vendor's translator, including Hypercubic's. The four translations were written for this
-  measurement and stand for common hand or tool translations in general.
-- They hold for GnuCOBOL 3.2 with `-std=ibm`. In particular `-std=ibm` leaves binary truncation off, so `COMP` fields
-  wrap at 16, 32 or 64 bits. Whether IBM Enterprise COBOL agrees depends on its `TRUNC` option; that is an open
-  question and is written down as one.
+- They say nothing about any vendor's translator, including Hypercubic's. The four translations were written for this measurement and stand for common hand or tool translations in general.
+- They hold for GnuCOBOL 3.2 with `-std=ibm`. In particular `-std=ibm` leaves binary truncation off, so `COMP` fields wrap at 16, 32 or 64 bits. Whether IBM Enterprise COBOL agrees depends on its `TRUNC` option; that is an open question and is written down as one.
 - Statements are measured one at a time, with no data flow, no intrinsic functions, and no MQ or CICS fields.
+- The parser covers the arithmetic this measurement needs, not all of COBOL: it is not a COBOL compiler or translator, and the forms it does not support are listed with a reason.
 
-## Questions I expect, and the answers
+## What I learned
 
-**Why not just use `Decimal`?** Because `Decimal`'s default rounding is half-even while COBOL's `ROUNDED` is half
-away from zero, and because `Decimal` says nothing about what a field can hold. The `decimal_half_even` row exists to
-make exactly that point with numbers.
+That overflow, not rounding, is the larger source of disagreement: the `exact_no_size` and `float_truncate` rows usually show it, and I would read it off the rendered table when asked rather than from memory. What would come next: model data flow between statements, add IBM Enterprise COBOL as a second reference with `TRUNC` variations, and turn the per-statement record into a regression check that a translator can be run against.
 
-**Why z3?** Because the interesting inputs are rare. A rounding tie for `WS-A / 2` is one parity out of the whole
-range; an overflow of a `COMP` field is a narrow band. Sampling would find some of them eventually; asking a solver
-for one finds them in milliseconds and gives a reproducible witness.
+## Talking points
 
-**How do you know the harness is right?** Its tests compare against compiler behaviour that is easy to state and
-easy to check: `200 * 200` into `S9(4) COMP` gives `-25536`, a size error keeps the prior value, display overflow
-keeps the low-order digits, `125 / 2` rounded gives `63` and unrounded `62`. The `cobol_exact_agreement` metric is
-the same check at scale.
+- One slide: `COMPUTE WS-BAL = WS-BAL - WS-AMT` and the five ways to write it in Python.
+- One slide: the pipeline, emphasising that the reference is the compiler.
+- The rendered results table.
+- The limits slide: GnuCOBOL only, one statement at a time, wide inputs, the open question about `TRUNC`.
+- The next step: data flow and a second compiler.
 
-**What would you do next?** Model data flow between statements, add IBM Enterprise COBOL as a second reference with
-`TRUNC` variations, and turn the per-statement record into a regression check that a translator can be run against.
+## Questions to expect
 
-**What surprised you most?** Read it off the rendered table when asked rather than from memory. The `exact_no_size`
-and `float_truncate` rows usually show that overflow, not rounding, is the larger source of disagreement.
+**Why not just use `Decimal`?**
 
-## How I would present it in five minutes
+Because `Decimal`'s default rounding is half-even while COBOL's `ROUNDED` is half away from zero, and because `Decimal` says nothing about what a field can hold. The `decimal_half_even` row exists to make exactly that point with numbers.
 
-1. One slide: `COMPUTE WS-BAL = WS-BAL - WS-AMT` and the five ways to write it in Python.
-2. One slide: the pipeline, emphasising that the reference is the compiler.
-3. The rendered results table.
-4. The limits slide: GnuCOBOL only, one statement at a time, wide inputs, the open question about `TRUNC`.
-5. The next step: data flow and a second compiler.
+**Why z3?**
+
+Because the interesting inputs are rare. A rounding tie for `WS-A / 2` is one parity out of the whole range; an overflow of a `COMP` field is a narrow band. Sampling would find some of them eventually; asking a solver for one finds them in milliseconds and gives a reproducible witness.
+
+**How do you know the harness is right?**
+
+Its tests compare against compiler behaviour that is easy to state and easy to check: `200 * 200` into `S9(4) COMP` gives `-25536`, a size error keeps the prior value, display overflow keeps the low-order digits, `125 / 2` rounded gives `63` and unrounded `62`. The `cobol_exact_agreement` metric is the same check at scale.
+
+**What would you do next?**
+
+Model data flow between statements, add IBM Enterprise COBOL as a second reference with `TRUNC` variations, and turn the per-statement record into a regression check that a translator can be run against.
+
+**What surprised you most?**
+
+Read it off the rendered table when asked rather than from memory. The `exact_no_size` and `float_truncate` rows usually show that overflow, not rounding, is the larger source of disagreement.
