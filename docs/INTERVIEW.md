@@ -62,7 +62,7 @@ That overflow, not rounding, is the larger source of disagreement: the `exact_no
 ## Talking points
 
 - One slide: `COMPUTE WS-BAL = WS-BAL - WS-AMT` and the five ways to write it in Python.
-- One slide: CardDemo's `ADD 1 TO WS-TRAN-ID-NUM`, where a float translation hands out the same transaction ID twice above 2^53.
+- One slide: CardDemo's `ADD 1 TO WS-TRAN-ID-NUM`, where a float translation can repeat or skip a transaction ID above 2^53.
 - One slide: the pipeline, emphasising that the reference is the compiler.
 - The rendered results table.
 - The limits slide: GnuCOBOL only, one statement at a time, wide inputs, the open question about `TRUNC`.

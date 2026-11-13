@@ -16,7 +16,8 @@ CardDemo's bill-payment program `COBIL00C` makes the next transaction ID like th
 
 GnuCOBOL stores `9625004552692988 + 1` as `9625004552692989`. A translation that computes through Python `float`
 stores `9625004552692988` again, so the "next" ID equals the last one: a double cannot hold every integer above
-2^53. That happens on 33 of the statement's 1,000 random inputs, for both float translations. At the top of the
+2^53. Both float translations store a wrong ID on 33 of the statement's 1,000 random inputs, sometimes repeating the
+last ID and sometimes skipping ahead. At the top of the
 picture the storage rule shows up instead. `9999999999999999 + 1` leaves `0` in a `PIC 9(16)` field in COBOL, while
 every translation without COBOL's storage rule keeps `10000000000000000`.
 
@@ -26,7 +27,7 @@ GnuCOBOL.
 
 ## What the run found
 
-- 201 arithmetic statements in 44 CardDemo programs. 142 are harnessed, and 59 are listed as unsupported with a
+- 201 arithmetic statements, found in 28 of the 44 CardDemo programs scanned. 142 are harnessed, and 59 are listed as unsupported with a
   reason.
 - COBOL's storage rule, modelled exactly (`cobol_exact`), stores the same value as GnuCOBOL on every one of the
   142,280 cases (142,000 pinned random and 280 solver-found boundary cases).
@@ -233,8 +234,8 @@ measured results stand, but they are real and are not fixed:
 
 - A sign and its digits split across a fixed-format continuation line are refused as unsupported. CardDemo's 11
   continuation lines are all inside HTML string literals.
-- `COPY REPLACING` of a word also rewrites the same text inside a quoted literal. CardDemo's only use (`CSSETATY`)
-  replaces names in `IF` and `MOVE` statements, and its one literal is `'*'`.
+- `COPY REPLACING` of a word also rewrites the same text inside a quoted literal. CardDemo's only copybook copied with
+  `REPLACING` (`CSSETATY`) replaces names in `IF` and `MOVE` statements, and its one literal is `'*'`.
 - There is no compiler-backed unit test for 32-bit `COMP` wrapping (16 and 64 bits have one). The experiment does
   run CardDemo's 32 harnessed statements with 32-bit binary targets through GnuCOBOL, but whether their random
   cases reach 32-bit overflow was not checked.
