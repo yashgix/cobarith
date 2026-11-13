@@ -98,8 +98,6 @@ python demo.py --readme README.md --out README.md
 CardDemo sources under `upstream/` are committed; nothing is fetched at run time. `make data-check` re-checks them
 against `upstream/MANIFEST.json`.
 
-## Results
-
 Rendered by `demo.py` from `results/metrics.json` and `results/statements.jsonl`, which come from running
 GnuCOBOL. Nothing between the markers is typed by hand; the summary at the top quotes these files. Rerunning the
 experiment reproduces both files byte for byte.
