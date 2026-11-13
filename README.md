@@ -64,8 +64,110 @@ Rendered by `demo.py` from `results/metrics.json` and `results/statements.jsonl`
 GnuCOBOL. No result number is typed by hand.
 
 <!-- results:start -->
-_No results yet. Run `python experiment.py --out results/metrics.json`, then
-`python demo.py --readme README.md --out README.md`._
+## Results
+
+### Metrics
+
+| Metric | Value |
+| --- | --- |
+| `cases_boundary` | 280 |
+| `cases_random` | 142000 |
+| `cobol_exact_agreement` | 1.000000 |
+| `cobol_exact_cases_differ` | 0 |
+| `copybooks_missing` | 9 |
+| `decimal_half_even_cases_differ_arithmetic` | 356 |
+| `decimal_half_even_cases_differ_boundary` | 236 |
+| `decimal_half_even_cases_differ_random` | 8196 |
+| `decimal_half_even_cases_differ_storage` | 8076 |
+| `decimal_half_even_statements_differ` | 88 |
+| `decimal_half_even_statements_differ_arithmetic` | 1 |
+| `exact_no_size_cases_differ_arithmetic` | 0 |
+| `exact_no_size_cases_differ_boundary` | 234 |
+| `exact_no_size_cases_differ_random` | 7842 |
+| `exact_no_size_cases_differ_storage` | 8076 |
+| `exact_no_size_statements_differ` | 88 |
+| `exact_no_size_statements_differ_arithmetic` | 0 |
+| `float_round_cases_differ_arithmetic` | 430 |
+| `float_round_cases_differ_boundary` | 240 |
+| `float_round_cases_differ_random` | 8266 |
+| `float_round_cases_differ_storage` | 8076 |
+| `float_round_statements_differ` | 88 |
+| `float_round_statements_differ_arithmetic` | 3 |
+| `float_truncate_cases_differ_arithmetic` | 3250 |
+| `float_truncate_cases_differ_boundary` | 235 |
+| `float_truncate_cases_differ_random` | 11091 |
+| `float_truncate_cases_differ_storage` | 8076 |
+| `float_truncate_statements_differ` | 88 |
+| `float_truncate_statements_differ_arithmetic` | 23 |
+| `programs_total` | 44 |
+| `statements_add` | 99 |
+| `statements_compute` | 84 |
+| `statements_decimal_risk` | 23 |
+| `statements_divide` | 1 |
+| `statements_flag_float` | 23 |
+| `statements_flag_scale` | 1 |
+| `statements_flag_sign` | 4 |
+| `statements_flag_size` | 118 |
+| `statements_harnessed` | 142 |
+| `statements_multiply` | 0 |
+| `statements_subtract` | 17 |
+| `statements_total` | 201 |
+| `statements_unsupported` | 59 |
+| `unsupported_corresponding` | 0 |
+| `unsupported_exponentiation` | 0 |
+| `unsupported_floating_point_usage` | 0 |
+| `unsupported_index_item` | 0 |
+| `unsupported_intrinsic_function` | 28 |
+| `unsupported_length_of` | 4 |
+| `unsupported_non_numeric_field` | 0 |
+| `unsupported_nonnumeric_literal` | 0 |
+| `unsupported_numeric_edited_operand` | 0 |
+| `unsupported_p_scaling` | 0 |
+| `unsupported_reference_modification` | 0 |
+| `unsupported_remainder` | 1 |
+| `unsupported_rounded_mode` | 0 |
+| `unsupported_special_register` | 1 |
+| `unsupported_syntax` | 0 |
+| `unsupported_unresolved_name` | 25 |
+
+### Arithmetic differences
+
+| Statement | Translations | Example (decimal) |
+| --- | --- | --- |
+| `CBACT04C:352:ADD` | float_truncate | WS-TOTAL-INT=79772.94, ACCT-CURR-BAL=-78930.80 -> COBOL ACCT-CURR-BAL=842.14; float_truncate ACCT-CURR-BAL=842.13 |
+| `CBACT04C:464:COMPUTE` | float_round, decimal_half_even, float_truncate | WS-MONTHLY-INT=80730.38, TRAN-CAT-BAL=-86175.28, DIS-INT-RATE=-3899.65 -> COBOL WS-MONTHLY-INT=280044.52; float_round WS-MONTHLY-INT=280044.53 |
+| `CBACT04C:467:ADD` | float_truncate | WS-MONTHLY-INT=-405130930.65, WS-TOTAL-INT=674681504.80 -> COBOL WS-TOTAL-INT=269550574.15; float_truncate WS-TOTAL-INT=269550574.14 |
+| `CBPAUP0C:289:SUBTRACT` | float_truncate | PA-APPROVED-AMT=80961.00, PA-APPROVED-AUTH-AMT=-74274.42 -> COBOL PA-APPROVED-AUTH-AMT=-155235.42; float_truncate PA-APPROVED-AUTH-AMT=-155235.41 |
+| `CBPAUP0C:292:SUBTRACT` | float_truncate | PA-TRANSACTION-AMT=-18033.49, PA-DECLINED-AUTH-AMT=-51000.14 -> COBOL PA-DECLINED-AUTH-AMT=-32966.65; float_truncate PA-DECLINED-AUTH-AMT=-32966.64 |
+| `CBSTM03A:429:ADD` | float_truncate | TRNX-AMT=-706715378.72, WS-TOTAL-AMT=841215095.37 -> COBOL WS-TOTAL-AMT=134499716.65; float_truncate WS-TOTAL-AMT=134499716.64 |
+| `CBTRN02C:403:COMPUTE` | float_truncate | WS-TEMP-BAL=43126.05, ACCT-CURR-CYC-CREDIT=-26495.38, ACCT-CURR-CYC-DEBIT=-11346.51, DALYTRAN-AMT=15558.30 -> COBOL WS-TEMP-BAL=409.43; float_truncate WS-TEMP-BAL=409.42 |
+| `CBTRN02C:508:ADD` | float_truncate | DALYTRAN-AMT=-161388373.55, TRAN-CAT-BAL=352482685.01 -> COBOL TRAN-CAT-BAL=191094311.46; float_truncate TRAN-CAT-BAL=191094311.45 |
+| `CBTRN02C:527:ADD` | float_truncate | DALYTRAN-AMT=63487.67, TRAN-CAT-BAL=-76458.23 -> COBOL TRAN-CAT-BAL=-12970.56; float_truncate TRAN-CAT-BAL=-12970.55 |
+| `CBTRN02C:547:ADD` | float_truncate | DALYTRAN-AMT=-82107.04, ACCT-CURR-BAL=38331.29 -> COBOL ACCT-CURR-BAL=-43775.75; float_truncate ACCT-CURR-BAL=-43775.74 |
+| `CBTRN02C:549:ADD` | float_truncate | DALYTRAN-AMT=-40852883.40, ACCT-CURR-CYC-CREDIT=-5327697491.32 -> COBOL ACCT-CURR-CYC-CREDIT=-5368550374.72; float_truncate ACCT-CURR-CYC-CREDIT=-5368550374.71 |
+| `CBTRN02C:551:ADD` | float_truncate | DALYTRAN-AMT=-42290.57, ACCT-CURR-CYC-DEBIT=-21842.94 -> COBOL ACCT-CURR-CYC-DEBIT=-64133.51; float_truncate ACCT-CURR-CYC-DEBIT=-64133.50 |
+| `CBTRN03C:200:ADD` | float_truncate | TRAN-AMT=-95896.15, WS-PAGE-TOTAL=67626.45, WS-ACCOUNT-TOTAL=45022.55 -> COBOL WS-PAGE-TOTAL=-28269.70, WS-ACCOUNT-TOTAL=-50873.60; float_truncate WS-PAGE-TOTAL=-28269.69, WS-ACCOUNT-TOTAL=-50873.59 |
+| `CBTRN03C:287:ADD` | float_truncate | TRAN-AMT=72927.07, WS-PAGE-TOTAL=9973.01, WS-ACCOUNT-TOTAL=-89269.27 -> COBOL WS-PAGE-TOTAL=82900.08, WS-ACCOUNT-TOTAL=-16342.20; float_truncate WS-PAGE-TOTAL=82900.08, WS-ACCOUNT-TOTAL=-16342.19 |
+| `CBTRN03C:297:ADD` | float_truncate | WS-PAGE-TOTAL=687167962.74, WS-GRAND-TOTAL=-991301806.53 -> COBOL WS-GRAND-TOTAL=-304133843.79; float_truncate WS-GRAND-TOTAL=-304133843.78 |
+| `COBIL00C:217:ADD` | float_round, float_truncate | WS-TRAN-ID-NUM=9625004552692988 -> COBOL WS-TRAN-ID-NUM=9625004552692989; float_round WS-TRAN-ID-NUM=9625004552692988 |
+| `COBIL00C:234:COMPUTE` | float_truncate | ACCT-CURR-BAL=9678357289.81, TRAN-AMT=247178171.28 -> COBOL ACCT-CURR-BAL=9431179118.53; float_truncate ACCT-CURR-BAL=9431179118.52 |
+| `COPAUA0C:666:COMPUTE` | float_truncate | WS-AVAILABLE-AMT=-78443.95, PA-CREDIT-LIMIT=21925.47, PA-CREDIT-BALANCE=97565.43 -> COBOL WS-AVAILABLE-AMT=-75639.96; float_truncate WS-AVAILABLE-AMT=-75639.95 |
+| `COPAUA0C:674:COMPUTE` | float_truncate | WS-AVAILABLE-AMT=-17716.14, ACCT-CREDIT-LIMIT=-80285.15, ACCT-CURR-BAL=-41428.20 -> COBOL WS-AVAILABLE-AMT=-38856.95; float_truncate WS-AVAILABLE-AMT=-38856.94 |
+| `COPAUA0C:815:ADD` | float_truncate | WS-APPROVED-AMT=302400820.36, PA-APPROVED-AUTH-AMT=-382053667.07 -> COBOL PA-APPROVED-AUTH-AMT=-79652846.71; float_truncate PA-APPROVED-AUTH-AMT=-79652846.70 |
+| `COPAUA0C:817:ADD` | float_truncate | WS-APPROVED-AMT=9450.97, PA-CREDIT-BALANCE=5669.11 -> COBOL PA-CREDIT-BALANCE=15120.08; float_truncate PA-CREDIT-BALANCE=15120.07 |
+| `COPAUA0C:821:ADD` | float_truncate | PA-TRANSACTION-AMT=-64989.88, PA-DECLINED-AUTH-AMT=61579.37 -> COBOL PA-DECLINED-AUTH-AMT=-3410.51; float_truncate PA-DECLINED-AUTH-AMT=-3410.50 |
+| `COTRN02C:449:ADD` | float_round, float_truncate | WS-TRAN-ID-N=9288065211967810 -> COBOL WS-TRAN-ID-N=9288065211967811; float_round WS-TRAN-ID-N=9288065211967812 |
+
+### Storage
+
+| Translation | Statements differ | Cases: storage | Cases: arithmetic |
+| --- | ---: | ---: | ---: |
+| exact_no_size | 88 | 8076 | 0 |
+| float_round | 88 | 8076 | 430 |
+| decimal_half_even | 88 | 8076 | 356 |
+| float_truncate | 88 | 8076 | 3250 |
+
+COBOL exact agreement: 1.000000 (0 differing cases).
 <!-- results:end -->
 
 ## Scope and limits
