@@ -3,6 +3,41 @@
 Where plausible Python translations of real COBOL arithmetic give a different stored answer from COBOL, measured
 statement by statement on the AWS CardDemo application with GnuCOBOL 3.2.
 
+## One real example
+
+CardDemo's bill-payment program `COBIL00C` makes the next transaction ID like this (line 217):
+
+```cobol
+       05 WS-TRAN-ID-NUM             PIC 9(16) VALUE ZEROS.
+       ...
+           MOVE TRAN-ID     TO WS-TRAN-ID-NUM
+           ADD 1 TO WS-TRAN-ID-NUM
+```
+
+GnuCOBOL stores `9625004552692988 + 1` as `9625004552692989`. A translation that computes through Python `float`
+stores `9625004552692988` again, so the "next" ID equals the last one: a double cannot hold every integer above
+2^53. That happens on 33 of the statement's 1,000 random inputs, for both float translations. At the top of the
+picture the storage rule shows up instead. `9999999999999999 + 1` leaves `0` in a `PIC 9(16)` field in COBOL, while
+every translation without COBOL's storage rule keeps `10000000000000000`.
+
+The inputs span each field's whole picture range, so this is exposure, not a claim that CardDemo's real IDs get that
+large. Both values come from `results/statements.jsonl` (`COBIL00C:217:ADD`), measured by running the statement in
+GnuCOBOL.
+
+## What the run found
+
+- 201 arithmetic statements in 44 CardDemo programs. 142 are harnessed, and 59 are listed as unsupported with a
+  reason.
+- COBOL's storage rule, modelled exactly (`cobol_exact`), stores the same value as GnuCOBOL on every one of the
+  142,280 cases (142,000 pinned random and 280 solver-found boundary cases).
+- Under each of the four translations, 88 statements store a different value in at least one case. All 88 include
+  storage differences: a result too large for its field, a negative value in an unsigned field or a binary wrap,
+  none of which the translations model.
+- On the arithmetic alone, ignoring storage, `float_truncate` differs on 23 statements, `float_round` on 3 and
+  `decimal_half_even` on 1 (the monthly-interest `COMPUTE` in `CBACT04C`, where COBOL truncates to the cent and the translation rounds).
+
+The full tables, rendered from `results/`, are under [Results](#results).
+
 ## What it answers
 
 A COBOL-to-Python translation has to reproduce COBOL's arithmetic exactly, and the parts that are easy to get wrong
@@ -46,8 +81,12 @@ in production data.
 
 ## Running it
 
+Python 3.12 or later and GnuCOBOL 3.2 (`brew install gnucobol` on macOS):
+
 ```sh
-make test                                     # unittest
+python3 -m venv .venv && . .venv/bin/activate
+pip install z3-solver==5.3.3.0 ruff
+make test                                     # unittest; compiler-backed tests skip without cobc
 make lint                                     # ruff check and format
 python experiment.py --out results/metrics.json
 python demo.py                                # short console summary
@@ -61,7 +100,8 @@ against `upstream/MANIFEST.json`.
 ## Results
 
 Rendered by `demo.py` from `results/metrics.json` and `results/statements.jsonl`, which come from running
-GnuCOBOL. No result number is typed by hand.
+GnuCOBOL. Nothing between the markers is typed by hand; the summary at the top quotes these files. Rerunning the
+experiment reproduces both files byte for byte.
 
 <!-- results:start -->
 ## Results
@@ -184,6 +224,22 @@ COBOL exact agreement: 1.000000 (0 differing cases).
   reason but not harnessed; they are counted in `statements_unsupported`.
 - Some IBM system copybooks (`DFHAID`, `DFHBMSCA`, `CMQ*`, `SQLCA`) are not part of CardDemo, so fields that come
   only from them stay unresolved. Those statements are listed, not harnessed.
+- This is a measurement on CardDemo, not a COBOL compiler, a translator or a claim of general COBOL compatibility.
+
+### Known gaps
+
+The last automated code review found four medium issues. None touches a statement CardDemo contains, so the
+measured results stand, but they are real and are not fixed:
+
+- A sign and its digits split across a fixed-format continuation line are refused as unsupported. CardDemo's 11
+  continuation lines are all inside HTML string literals.
+- `COPY REPLACING` of a word also rewrites the same text inside a quoted literal. CardDemo's only use (`CSSETATY`)
+  replaces names in `IF` and `MOVE` statements, and its one literal is `'*'`.
+- There is no compiler-backed unit test for 32-bit `COMP` wrapping (16 and 64 bits have one). The experiment does
+  run CardDemo's 32 harnessed statements with 32-bit binary targets through GnuCOBOL, but whether their random
+  cases reach 32-bit overflow was not checked.
+- The harness's compile-failure and wrong-output-count paths have no tests. Either failure stops the experiment;
+  neither can change a stored value.
 
 ## Upstream data
 
@@ -196,3 +252,14 @@ commit `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, Apache-2.0; `LICENSE` and `NO
 
 `docs/DESIGN.md` covers the parsing rules, the storage rule, the translations and the case design;
 `docs/INTERVIEW.md` covers how to explain the project and what the numbers do and do not show.
+
+## How this was built
+
+Yash Gupta directed the project. AI coding agents (Claude Code and an agent build pipeline) wrote most of the code
+and tests, and automated model reviews checked them. Those reviews are not an external audit. The evidence is the
+code, the tests and the GnuCOBOL-measured results in `results/`.
+
+## License
+
+MIT for this repository's code (`LICENSE`). The CardDemo sources in `upstream/carddemo/` stay under their own
+Apache-2.0 license, with its `LICENSE` and `NOTICE`.
