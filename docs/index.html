@@ -101,6 +101,7 @@ table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
 th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-size: var(--s0); color: var(--muted); font-weight: 500; background: var(--band); }
 tr:last-child td { border-bottom: 0; }
+td code { overflow-wrap: normal; white-space: nowrap; }
 td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
 .btn { display: inline-flex; align-items: center; gap: 0.4rem; font: inherit; font-weight: 500; padding: 0.55rem 1rem; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--paper); cursor: pointer; text-decoration: none; }
 footer { padding-block: 2rem 3rem; border-top: 1px solid var(--line); }
@@ -188,7 +189,7 @@ footer { padding-block: 2rem 3rem; border-top: 1px solid var(--line); }
     <ul>
       <li>COBOL keeps fixed-point decimals exactly and truncates toward zero when it stores a result. Python <code>float</code> and <code>round()</code> do neither reliably.</li>
       <li><code>ROUNDED</code> in COBOL sends halves away from zero. <code>Decimal</code> with <code>ROUND_HALF_EVEN</code> sends them to even.</li>
-      <li>A result too large for its field is cut to its low-order digits, not raised as an error.</li>
+      <li>A result too large for its field is cut to its low-order digits (or, with <code>ON SIZE ERROR</code>, left as it was), not raised as an error.</li>
       <li><code>COMP</code> fields are binary, and the compiler's truncation setting decides whether an overflowing value wraps.</li>
     </ul>
     <p>So a translation can look right in review and still store different money and IDs. Checking each statement against the compiler finds those cases directly.</p>
