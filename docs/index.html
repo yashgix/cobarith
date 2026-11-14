@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>cobarith</title>
+<meta name="description" content="Where Python translations of real COBOL arithmetic store a different value than the COBOL program does, measured on AWS CardDemo with GnuCOBOL 3.2.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one 760px reading column on white, the example and the chart widen to 980px. Teal is the accent and
+   means "matches COBOL"; amber only means a translation stored a different value. One light theme on purpose. */
+:root {
+  color-scheme: light;
+  --paper: #ffffff;
+  --band: #f2f7f6;
+  --ink: #142421;
+  --muted: #52625f;
+  --line: #dde7e5;
+  --accent: #0b6b5d;
+  --accent-soft: #e3f2ef;
+  --differ: #b45309;
+  --differ-soft: #fdf1e4;
+  --code: #eef4f3;
+  --sans: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --s0: 0.8125rem; --s1: 1.0625rem; --s2: 1.25rem; --s3: 1.6rem; --s4: clamp(2.2rem, 5.5vw, 3.2rem);
+  --radius: 12px;
+}
+body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: var(--s1); line-height: 1.65; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.col { max-width: 760px; margin-inline: auto; }
+.wide { max-width: 980px; margin-inline: auto; }
+a { color: var(--accent); text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h2 { font-size: var(--s3); font-weight: 600; letter-spacing: -0.015em; }
+h3 { font-size: var(--s1); font-weight: 600; }
+p, ul, ol { margin: 0; }
+ul, ol { padding-left: 1.25rem; display: flex; flex-direction: column; gap: 0.4rem; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+code { background: var(--code); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+.muted { color: var(--muted); }
+.small { font-size: var(--s0); }
+.num { font-variant-numeric: tabular-nums; }
+.eyebrow { font-family: var(--mono); font-size: var(--s0); font-weight: 500; color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase; }
+.stack { display: flex; flex-direction: column; gap: 1.1rem; }
+section { padding-block: 2.75rem; }
+section + section { border-top: 1px solid var(--line); }
+
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: rgba(255,255,255,0.94); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--paper); }
+.bar-in { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-block: 0.6rem; }
+.brand { font-family: var(--mono); font-weight: 600; }
+.tabs { display: flex; gap: 0.25rem; }
+.bar-in .tabs { margin-left: auto; }
+.gh { font-size: var(--s0); font-weight: 600; text-decoration: none; white-space: nowrap; color: var(--accent); border: 1px solid var(--accent); border-radius: 999px; padding: 0.3rem 0.8rem; }
+.gh:hover { background: var(--accent-soft); }
+.tabs button { font: inherit; font-size: var(--s0); font-weight: 500; border: 0; background: transparent; color: var(--muted); padding: 0.4rem 0.8rem; border-radius: 999px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent); }
+
+header { padding-block: 3.5rem 2.25rem; background: linear-gradient(180deg, var(--band), var(--paper)); }
+h1 { font-family: var(--mono); font-size: var(--s4); font-weight: 600; letter-spacing: -0.03em; }
+.lede { font-size: var(--s2); color: var(--muted); max-width: 60ch; line-height: 1.55; }
+.meta { display: flex; flex-wrap: wrap; gap: 0.4rem 1.25rem; font-size: var(--s0); color: var(--muted); }
+.meta b { color: var(--ink); font-weight: 600; }
+
+.example { background: var(--band); border-radius: var(--radius); padding: 1.5rem; display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+.example > * { min-width: 0; }
+pre { margin: 0; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; padding: 0.9rem 1rem; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.55; }
+.ledger { display: flex; flex-direction: column; gap: 0.6rem; }
+.row { display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 0.75rem; align-items: baseline; padding: 0.6rem 0.8rem; border-radius: 8px; background: var(--paper); border: 1px solid var(--line); }
+.row .who { font-size: var(--s0); color: var(--muted); }
+.row .val { font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; }
+.row.ok .val { color: var(--accent); }
+.row.bad { border-color: #f1d3b3; background: var(--differ-soft); }
+.row.bad .val { color: var(--differ); }
+.row .val small { font-weight: 400; color: var(--muted); font-family: var(--sans); }
+
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+.tile { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.tile .big { font-family: var(--mono); font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tile .big.ok { color: var(--accent); }
+.tile .big.bad { color: var(--differ); }
+
+.chart { display: flex; flex-direction: column; gap: 0.9rem; }
+.bars { display: flex; flex-direction: column; gap: 0.55rem; }
+.b { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr) 7.5rem; gap: 0.75rem; align-items: center; }
+.b .name { font-family: var(--mono); font-size: var(--s0); overflow-wrap: anywhere; }
+.track { height: 22px; background: var(--code); border-radius: 4px; position: relative; overflow: hidden; }
+.fill { position: absolute; inset: 0 auto 0 0; background: var(--differ); border-radius: 4px; }
+.fill.zero { background: var(--accent); width: 3px !important; }
+.b .v { font-size: var(--s0); font-variant-numeric: tabular-nums; color: var(--muted); }
+.b .v b { color: var(--ink); }
+.axis { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr) 7.5rem; gap: 0.75rem; font-size: 0.72rem; color: var(--muted); }
+.axis .ticks { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: var(--s0); color: var(--muted); font-weight: 500; background: var(--band); }
+tr:last-child td { border-bottom: 0; }
+td.r, th.r { text-align: right; font-variant-numeric: tabular-nums; }
+.btn { display: inline-flex; align-items: center; gap: 0.4rem; font: inherit; font-weight: 500; padding: 0.55rem 1rem; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--paper); cursor: pointer; text-decoration: none; }
+footer { padding-block: 2rem 3rem; border-top: 1px solid var(--line); }
+
+@media (max-width: 760px) {
+  .example { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .b, .axis { grid-template-columns: 7.5rem minmax(0, 1fr) 5.5rem; }
+  .row { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
+  .brand { display: none; }
+  .tabs button { padding: 0.4rem 0.55rem; }
+  .gh { padding: 0.3rem 0.6rem; }
+}
+@media (prefers-reduced-motion: no-preference) { .fill { transition: width 0.6s ease; } }
+</style>
+</head>
+<body>
+
+<div class="bar wrap"><div class="wide bar-in">
+  <span class="brand">cobarith</span>
+  <div class="tabs" role="tablist" aria-label="View">
+    <button role="tab" id="tab-overview" aria-controls="overview" aria-selected="true" data-view="overview">Overview</button>
+    <button role="tab" id="tab-details" aria-controls="details" aria-selected="false" data-view="details">Technical details</button>
+  </div>
+  <a class="gh" href="https://github.com/yashgix/cobarith" target="_blank" rel="noopener">GitHub ↗</a>
+</div></div>
+
+<main id="overview" role="tabpanel" aria-labelledby="tab-overview">
+  <header class="wrap"><div class="col stack">
+    <p class="eyebrow">COBOL arithmetic · AWS CardDemo · GnuCOBOL 3.2</p>
+    <h1>cobarith</h1>
+    <p class="lede">Where Python translations of real COBOL arithmetic store a different value than the COBOL program does. Every supported arithmetic statement in AWS CardDemo runs through GnuCOBOL and through four Python translations, and the stored values are compared case by case.</p>
+    <div class="meta"><span><b class="num">142,280</b> cases measured</span><span><b>0</b> differences for the exact model</span><span><a href="https://github.com/yashgix/cobarith">github.com/yashgix/cobarith</a></span></div>
+  </div></header>
+
+  <section class="wrap" aria-labelledby="ex-h"><div class="wide stack">
+    <p class="eyebrow">One real example</p>
+    <h2 id="ex-h">The next transaction ID can repeat the last one</h2>
+    <div class="example">
+      <div class="stack">
+        <p class="small muted">CardDemo's bill-payment program <code>COBIL00C</code>, line 217, makes the next transaction ID:</p>
+<pre>       05 WS-TRAN-ID-NUM   PIC 9(16) VALUE ZEROS.
+       ...
+           MOVE TRAN-ID     TO WS-TRAN-ID-NUM
+           ADD 1 TO WS-TRAN-ID-NUM</pre>
+        <p class="small muted">A double cannot hold every integer above 2<sup>53</sup>, and a 16-digit ID goes past that.</p>
+      </div>
+      <div class="ledger">
+        <div class="row"><span class="who">Last ID</span><span class="val num">9625004552692988</span></div>
+        <div class="row ok"><span class="who">GnuCOBOL stores</span><span class="val num">9625004552692989</span></div>
+        <div class="row bad"><span class="who">Python <code>float</code> stores</span><span class="val num">9625004552692988 <small>same as the last ID</small></span></div>
+        <p class="small">Both float translations store a wrong ID on <b class="num">33 of 1,000</b> random inputs for this statement, sometimes repeating the last ID and sometimes skipping ahead.</p>
+        <p class="small muted">At the top of the field the storage rule shows instead. <code>9999999999999999 + 1</code> leaves <code>0</code> in a <code>PIC 9(16)</code> field in COBOL, while a translation without that rule keeps <code>10000000000000000</code>.</p>
+      </div>
+    </div>
+    <p class="small muted">The inputs span each field's whole picture range, so this shows exposure. It is not a claim that CardDemo's real IDs get that large. Both values come from <code>results/statements.jsonl</code> (<code>COBIL00C:217:ADD</code>).</p>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="found-h"><div class="wide stack">
+    <p class="eyebrow">What the run found</p>
+    <h2 id="found-h">The exact model matches the compiler on every case. Every translation misses on storage.</h2>
+    <div class="tiles">
+      <div class="tile"><span class="big num">201</span><span class="small muted">arithmetic statements in 28 of the 44 programs scanned</span></div>
+      <div class="tile"><span class="big num">142</span><span class="small muted">harnessed through GnuCOBOL. 59 are listed as unsupported, each with a reason.</span></div>
+      <div class="tile"><span class="big ok num">0</span><span class="small muted">differences between COBOL's storage rule, modelled exactly, and GnuCOBOL over 142,280 cases</span></div>
+      <div class="tile"><span class="big bad num">88</span><span class="small muted">statements store a different value under each of the four translations</span></div>
+    </div>
+    <div class="chart" role="img" aria-label="Statements that differ on arithmetic alone: float_truncate 23, float_round 3, decimal_half_even 1, exact_no_size 0, out of 142 harnessed.">
+      <h3>Differences on the arithmetic alone, ignoring storage</h3>
+      <p class="small muted">Statements out of the 142 harnessed. The case count is out of 142,280.</p>
+      <div class="bars">
+        <div class="b"><span class="name">float_truncate</span><span class="track"><span class="fill" style="width:92%"></span></span><span class="v"><b class="num">23</b> · 3,250 cases</span></div>
+        <div class="b"><span class="name">float_round</span><span class="track"><span class="fill" style="width:12%"></span></span><span class="v"><b class="num">3</b> · 430 cases</span></div>
+        <div class="b"><span class="name">decimal_half_even</span><span class="track"><span class="fill" style="width:4%"></span></span><span class="v"><b class="num">1</b> · 356 cases</span></div>
+        <div class="b"><span class="name">exact_no_size</span><span class="track"><span class="fill zero"></span></span><span class="v"><b class="num">0</b> · 0 cases</span></div>
+      </div>
+      <div class="axis" aria-hidden="true"><span></span><span class="ticks"><span>0</span><span>5</span><span>10</span><span>15</span><span>20</span><span>25</span></span><span></span></div>
+      <p class="small muted">The one <code>decimal_half_even</code> statement is the monthly-interest <code>COMPUTE</code> in <code>CBACT04C</code>: COBOL truncates to the cent and the translation rounds. On top of these, all four translations differ on the same 8,076 storage cases across 88 statements, because none of them models a result too large for its field, a negative value in an unsigned field or a binary wrap.</p>
+    </div>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="why-h"><div class="col stack">
+    <p class="eyebrow">Why it matters for a migration</p>
+    <h2 id="why-h">The risky part is the step that stores the result</h2>
+    <ul>
+      <li>COBOL keeps fixed-point decimals exactly and truncates toward zero when it stores a result. Python <code>float</code> and <code>round()</code> do neither reliably.</li>
+      <li><code>ROUNDED</code> in COBOL sends halves away from zero. <code>Decimal</code> with <code>ROUND_HALF_EVEN</code> sends them to even.</li>
+      <li>A result too large for its field is cut to its low-order digits, not raised as an error.</li>
+      <li><code>COMP</code> fields are binary, and the compiler's truncation setting decides whether an overflowing value wraps.</li>
+    </ul>
+    <p>So a translation can look right in review and still store different money and IDs. Checking each statement against the compiler finds those cases directly.</p>
+    <p class="small muted">The four translations are written for this measurement and stand for hand or tool translations in general. Nothing here is a claim about any vendor's translator.</p>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="lim-h"><div class="col stack">
+    <p class="eyebrow">Limits</p>
+    <h2 id="lim-h">What this does not show</h2>
+    <ul>
+      <li>It is a measurement on CardDemo. It is not a compiler, a translator or a claim of general COBOL compatibility.</li>
+      <li>The reference is GnuCOBOL 3.2 with <code>-std=ibm</code> only. Whether IBM Enterprise COBOL agrees depends on its <code>TRUNC</code> option, which is not tested.</li>
+      <li>Statements are measured one at a time, with no data flow between them.</li>
+      <li>The final automated code review found four medium issues. None touches a statement CardDemo contains, and none is fixed. They are listed under Technical details.</li>
+    </ul>
+    <p><button class="btn" type="button" data-view="details">Technical details →</button></p>
+  </div></section>
+</main>
+
+<main id="details" role="tabpanel" aria-labelledby="tab-details" hidden>
+  <header class="wrap"><div class="col stack">
+    <p class="eyebrow">Technical details</p>
+    <h1 style="font-size:clamp(1.8rem,4.4vw,2.5rem)">Method, results and gaps</h1>
+  </div></header>
+
+  <section class="wrap" aria-labelledby="pipe-h"><div class="col stack">
+    <h2 id="pipe-h">How it works</h2>
+    <ol>
+      <li><code>source.py</code> reads fixed-format source (columns 8 to 72, comments and continuation lines) and expands <code>COPY</code> and <code>EXEC SQL INCLUDE</code>.</li>
+      <li><code>data.py</code> parses <code>PICTURE</code> clauses into digits, scale, sign and capacity, and resolves qualified names.</li>
+      <li><code>stmt.py</code> parses each <code>ADD</code>, <code>SUBTRACT</code>, <code>MULTIPLY</code>, <code>DIVIDE</code> and <code>COMPUTE</code> into exact assignments, or marks it unsupported with one reason.</li>
+      <li><code>cases.py</code> makes pinned random inputs and z3-solved boundary inputs: a rounding tie, an exactly representable value, an overflow, a negative value for an unsigned field.</li>
+      <li><code>harness.py</code> generates one GnuCOBOL program per statement, runs it on the cases and prints every receiving field, so the stored value is measured.</li>
+      <li><code>translate.py</code> computes the same statement five ways (below).</li>
+      <li><code>experiment.py</code> writes <code>results/metrics.json</code> and one record per statement in <code>results/statements.jsonl</code>.</li>
+    </ol>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="tr-h"><div class="wide stack">
+    <h2 id="tr-h">The five computations</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Name</th><th>What it does</th><th class="r">Statements differ</th><th class="r">Storage cases</th><th class="r">Arithmetic cases</th></tr></thead>
+      <tbody>
+        <tr><td><code>cobol_exact</code></td><td>COBOL's own storage rule</td><td class="r">0</td><td class="r">0</td><td class="r">0</td></tr>
+        <tr><td><code>exact_no_size</code></td><td>Exact result, no storage rule</td><td class="r">88</td><td class="r">8,076</td><td class="r">0</td></tr>
+        <tr><td><code>float_round</code></td><td>Floats with <code>round()</code></td><td class="r">88</td><td class="r">8,076</td><td class="r">430</td></tr>
+        <tr><td><code>decimal_half_even</code></td><td><code>Decimal</code> with <code>ROUND_HALF_EVEN</code></td><td class="r">88</td><td class="r">8,076</td><td class="r">356</td></tr>
+        <tr><td><code>float_truncate</code></td><td>Floats, truncated</td><td class="r">88</td><td class="r">8,076</td><td class="r">3,250</td></tr>
+      </tbody>
+    </table></div>
+    <p class="small muted">Cases: 142,000 pinned random and 280 solver-found boundary inputs. Random cases are pinned to a hash of the statement id. Boundary cases are deterministic for one z3 version, and another solver may pick different witnesses, so only the boundary count can shift. Unsupported reasons: intrinsic function 28, unresolved name 25 (IBM system copybooks not in CardDemo), <code>LENGTH OF</code> 4, <code>REMAINDER</code> 1, special register 1.</p>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="ex2-h"><div class="wide stack">
+    <h2 id="ex2-h">More arithmetic differences from CardDemo</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Statement</th><th>Inputs</th><th>COBOL stores</th><th>Translation stores</th></tr></thead>
+      <tbody>
+        <tr><td><code>CBACT04C:464</code> COMPUTE</td><td class="num">WS-MONTHLY-INT 80730.38, TRAN-CAT-BAL -86175.28, DIS-INT-RATE -3899.65</td><td class="num">280044.52</td><td class="num">280044.53 <span class="muted small">float_round</span></td></tr>
+        <tr><td><code>CBACT04C:352</code> ADD</td><td class="num">WS-TOTAL-INT 79772.94, ACCT-CURR-BAL -78930.80</td><td class="num">842.14</td><td class="num">842.13 <span class="muted small">float_truncate</span></td></tr>
+        <tr><td><code>COBIL00C:234</code> COMPUTE</td><td class="num">ACCT-CURR-BAL 9678357289.81, TRAN-AMT 247178171.28</td><td class="num">9431179118.53</td><td class="num">9431179118.52 <span class="muted small">float_truncate</span></td></tr>
+        <tr><td><code>COTRN02C:449</code> ADD</td><td class="num">WS-TRAN-ID-N 9288065211967810</td><td class="num">9288065211967811</td><td class="num">9288065211967812 <span class="muted small">float_round</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="small muted">23 statements in all. The full list with one example each is in the README's Results section.</p>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="gap-h"><div class="col stack">
+    <h2 id="gap-h">Known gaps</h2>
+    <p>The last automated code review found four medium issues. None touches a statement CardDemo contains, so the measured results stand, but they are real and not fixed.</p>
+    <ul>
+      <li>A sign and its digits split across a continuation line are refused as unsupported. CardDemo's 11 continuation lines are all inside HTML string literals.</li>
+      <li><code>COPY REPLACING</code> of a word also rewrites the same text inside a quoted literal. CardDemo's only copybook copied with <code>REPLACING</code> (<code>CSSETATY</code>) has one literal, <code>'*'</code>.</li>
+      <li>There is no compiler-backed unit test for 32-bit <code>COMP</code> wrapping (16 and 64 bits have one).</li>
+      <li>The harness's compile-failure and wrong-output-count paths have no tests. Either failure stops the experiment, and neither can change a stored value.</li>
+    </ul>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="run-h"><div class="col stack">
+    <h2 id="run-h">Reproduce</h2>
+    <p class="small muted">Python 3.12 or later and GnuCOBOL 3.2 (<code>brew install gnucobol</code> on macOS). The run takes about 25 seconds and reproduces both results files byte for byte.</p>
+<pre>python3 -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install z3-solver==5.3.3.0 ruff
+make test        # 115 tests
+make lint
+python experiment.py --out results/metrics.json
+python demo.py --readme README.md --out README.md</pre>
+    <p class="small muted">CI runs lint, the data check and the tests on Ubuntu with GnuCOBOL 3.2.</p>
+  </div></section>
+
+  <section class="wrap" aria-labelledby="src-h"><div class="col stack">
+    <h2 id="src-h">Data, license and how it was built</h2>
+    <p><code>upstream/carddemo/</code> is a pinned, unmodified copy of <a href="https://github.com/aws-samples/aws-mainframe-modernization-carddemo">aws-mainframe-modernization-carddemo</a> at commit <code>59cc6c2</code>, under Apache-2.0 with its <code>LICENSE</code> and <code>NOTICE</code>. The project's own code is MIT.</p>
+    <p class="small muted">I directed the project. AI coding agents (Claude Code and an agent build pipeline) wrote most of the code and tests, and automated model reviews checked them. Those reviews are not an external audit. The evidence is the code, the tests and the GnuCOBOL-measured results.</p>
+    <p><button class="btn" type="button" data-view="overview">← Overview</button></p>
+  </div></section>
+</main>
+
+<footer class="wrap"><div class="wide small muted">cobarith · Yash Gupta · <a href="https://github.com/yashgix/cobarith">github.com/yashgix/cobarith</a></div></footer>
+
+<script>
+const views = ["overview", "details"];
+function show(v) {
+  if (!views.includes(v)) v = "overview";
+  for (const x of views) {
+    document.getElementById(x).hidden = x !== v;
+    document.getElementById("tab-" + x).setAttribute("aria-selected", String(x === v));
+  }
+}
+document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => {
+  history.replaceState(null, "", "#" + b.dataset.view);
+  show(b.dataset.view);
+  window.scrollTo(0, 0);
+}));
+addEventListener("hashchange", () => show(location.hash.slice(1)));
+show(location.hash.slice(1));
+</script>
+</body>
+</html>

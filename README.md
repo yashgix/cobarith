@@ -3,6 +3,9 @@
 Where plausible Python translations of real COBOL arithmetic give a different stored answer from COBOL, measured
 statement by statement on the AWS CardDemo application with GnuCOBOL 3.2.
 
+**Write-up: [yashgix.github.io/cobarith](https://yashgix.github.io/cobarith/)** (the same page is in
+[`docs/index.html`](docs/index.html))
+
 ## One real example
 
 CardDemo's bill-payment program `COBIL00C` makes the next transaction ID like this (line 217):
