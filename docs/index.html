@@ -106,7 +106,10 @@ footer { padding-block: 2rem 3rem; border-top: 1px solid var(--line); }
 @media (max-width: 760px) {
   .example { grid-template-columns: minmax(0, 1fr); padding: 1rem; }
   .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .b, .axis { grid-template-columns: 7.5rem minmax(0, 1fr) 5.5rem; }
+  .b, .axis { grid-template-columns: minmax(0, 1fr) 5.5rem; }
+  .b { row-gap: 0.15rem; }
+  .b .name { grid-column: 1 / -1; }
+  .axis > span:first-child { display: none; }
   .row { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; }
   .brand { display: none; }
   .tabs button { padding: 0.4rem 0.55rem; }
