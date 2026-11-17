@@ -252,8 +252,7 @@ commit `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, Apache-2.0; `LICENSE` and `NO
 
 ## Design notes
 
-`docs/DESIGN.md` covers the parsing rules, the storage rule, the translations and the case design;
-`docs/INTERVIEW.md` covers how to explain the project and what the numbers do and do not show.
+`docs/DESIGN.md` covers the parsing rules, the storage rule, the translations and the case design.
 
 ## License
 
