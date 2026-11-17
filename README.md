@@ -230,8 +230,8 @@ COBOL exact agreement: 1.000000 (0 differing cases).
 
 ### Known gaps
 
-The last automated code review found four medium issues. None touches a statement CardDemo contains, so the
-measured results stand, but they are real and are not fixed:
+Four known issues are not fixed. None touches a statement CardDemo contains, so the measured results stand,
+but they are real:
 
 - A sign and its digits split across a fixed-format continuation line are refused as unsupported. CardDemo's 11
   continuation lines are all inside HTML string literals.

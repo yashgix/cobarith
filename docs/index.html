@@ -203,7 +203,7 @@ footer { padding-block: 2rem 3rem; border-top: 1px solid var(--line); }
       <li>It is a measurement on CardDemo. It is not a compiler, a translator or a claim of general COBOL compatibility.</li>
       <li>The reference is GnuCOBOL 3.2 with <code>-std=ibm</code> only. Whether IBM Enterprise COBOL agrees depends on its <code>TRUNC</code> option, which is not tested.</li>
       <li>Statements are measured one at a time, with no data flow between them.</li>
-      <li>The final automated code review found four medium issues. None touches a statement CardDemo contains, and none is fixed. They are listed under Technical details.</li>
+      <li>Four known issues are not fixed. None touches a statement CardDemo contains. They are listed under Technical details.</li>
     </ul>
     <p><button class="btn" type="button" data-view="details">Technical details →</button></p>
   </div></section>
@@ -259,7 +259,7 @@ footer { padding-block: 2rem 3rem; border-top: 1px solid var(--line); }
 
   <section class="wrap" aria-labelledby="gap-h"><div class="col stack">
     <h2 id="gap-h">Known gaps</h2>
-    <p>The last automated code review found four medium issues. None touches a statement CardDemo contains, so the measured results stand, but they are real and not fixed.</p>
+    <p>Four known issues are not fixed. None touches a statement CardDemo contains, so the measured results stand, but they are real.</p>
     <ul>
       <li>A sign and its digits split across a continuation line are refused as unsupported. CardDemo's 11 continuation lines are all inside HTML string literals.</li>
       <li><code>COPY REPLACING</code> of a word also rewrites the same text inside a quoted literal. CardDemo's only copybook copied with <code>REPLACING</code> (<code>CSSETATY</code>) has one literal, <code>'*'</code>.</li>
