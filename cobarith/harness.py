@@ -251,7 +251,7 @@ def run(stmt: Statement, cases: Sequence[Sequence[int]]) -> list[tuple[tuple[int
 
     source = program(stmt)
     payload = "".join(_case_line(stmt, case) + "\n" for case in checked)
-    compiler = os.environ.get("ARCTURUS_COBC") or "cobc"
+    compiler = os.environ.get("COBARITH_COBC") or "cobc"
 
     with tempfile.TemporaryDirectory() as tmp:
         folder = Path(tmp)

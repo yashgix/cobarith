@@ -18,7 +18,7 @@ def write(path: Path, lines: list[str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-COBC = os.environ.get("ARCTURUS_COBC") or shutil.which("cobc")
+COBC = os.environ.get("COBARITH_COBC") or shutil.which("cobc")
 
 
 def program(storage: list[str], files: list[str] = ()) -> list[str]:

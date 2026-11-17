@@ -5,7 +5,7 @@
 3. The candidate's harness (`harness.run`), which re-emits the statement.
 
 Each probe is also classified: GnuCOBOL accepts or rejects the source, and the candidate harnesses it or gives a
-reason. Usage: python tools/sweep.py OUT.jsonl  (needs $ARCTURUS_COBC or cobc on PATH; prints a summary)
+reason. Usage: python tools/sweep.py OUT.jsonl  (needs $COBARITH_COBC or cobc on PATH; prints a summary)
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from cobarith.harness import run  # noqa: E402
 from cobarith.inventory import inventory  # noqa: E402
 from cobarith.translate import translate  # noqa: E402
 
-COBC = os.environ.get("ARCTURUS_COBC") or shutil.which("cobc")
+COBC = os.environ.get("COBARITH_COBC") or shutil.which("cobc")
 B = "    "  # Area B indent inside the code area
 
 

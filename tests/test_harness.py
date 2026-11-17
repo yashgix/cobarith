@@ -12,7 +12,7 @@ from cobarith.source import tokenize_file
 from cobarith.stmt import parse_statements
 from cobarith.translate import translate
 
-COBC = os.environ.get("ARCTURUS_COBC") or shutil.which("cobc")
+COBC = os.environ.get("COBARITH_COBC") or shutil.which("cobc")
 
 
 def fixed(seq: str, indicator: str, code: str) -> str:
@@ -173,7 +173,7 @@ class RunValidationTest(unittest.TestCase):
             run(self.statement(), [(0, 1)])
 
     def test_missing_compiler_raises_value_error(self) -> None:
-        with mock.patch.dict(os.environ, {"ARCTURUS_COBC": "/nonexistent/cobc-3.2"}):
+        with mock.patch.dict(os.environ, {"COBARITH_COBC": "/nonexistent/cobc-3.2"}):
             with self.assertRaises(ValueError):
                 run(self.statement(), [(0, 1, 1)])
 

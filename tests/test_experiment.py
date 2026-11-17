@@ -8,7 +8,7 @@ from unittest import mock
 
 import experiment
 
-COBC = os.environ.get("ARCTURUS_COBC") or shutil.which("cobc")
+COBC = os.environ.get("COBARITH_COBC") or shutil.which("cobc")
 
 
 def fixed(seq: str, indicator: str, code: str) -> str:

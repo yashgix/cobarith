@@ -97,7 +97,7 @@ python demo.py                                # short console summary
 python demo.py --readme README.md --out README.md
 ```
 
-`experiment.py` needs GnuCOBOL 3.2: it uses `$ARCTURUS_COBC` when that is set and `cobc` on `PATH` otherwise. The
+`experiment.py` needs GnuCOBOL 3.2: it uses `$COBARITH_COBC` when that is set and `cobc` on `PATH` otherwise. The
 CardDemo sources under `upstream/` are committed; nothing is fetched at run time. `make data-check` re-checks them
 against `upstream/MANIFEST.json`.
 
@@ -254,12 +254,6 @@ commit `59cc6c2fd7ebd7ef7925cad552a01a4b8b6e4d5e`, Apache-2.0; `LICENSE` and `NO
 
 `docs/DESIGN.md` covers the parsing rules, the storage rule, the translations and the case design;
 `docs/INTERVIEW.md` covers how to explain the project and what the numbers do and do not show.
-
-## How this was built
-
-Yash Gupta directed the project. AI coding agents (Claude Code and an agent build pipeline) wrote most of the code
-and tests, and automated model reviews checked them. Those reviews are not an external audit. The evidence is the
-code, the tests and the GnuCOBOL-measured results in `results/`.
 
 ## License
 
