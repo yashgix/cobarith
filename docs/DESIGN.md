@@ -238,7 +238,7 @@ Not covered, by the specification's scope: the reasons it lists (intrinsic funct
 registers, `REMAINDER`, `CORRESPONDING`, exponentiation, reference modification, nonnumeric literals, `ROUNDED MODE`,
 floating-point and `P`-scaled operands, edited operands); figurative constants other than `ZERO`; free-format source;
 report-writer (`RD`) entries; and any other COBOL statement or data-division feature. Source that GnuCOBOL itself
-rejects is not modelled. A milestone that wanted more of COBOL would widen the specification first, not the parser
+rejects is not modelled. A later version that wanted more of COBOL would widen the specification first, not the parser
 alone.
 
 ## Checked against GnuCOBOL, statement by statement
